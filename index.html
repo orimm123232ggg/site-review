@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>בדיקת אתרים</title>
+<style>
+*{box-sizing:border-box}
+body{margin:0;font-family:Segoe UI,Arial,sans-serif;background:#f3f5f9;color:#1f2937}
+header{background:#2b5cff;color:#fff;padding:12px 16px;display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+header h1{font-size:20px;margin:0;flex:1}
+button{font:inherit;cursor:pointer;border:0;border-radius:8px;padding:8px 14px;background:#2b5cff;color:#fff}
+button.sec{background:#e5e9f2;color:#1f2937}
+button.red{background:#e5484d}
+header button{background:#fff;color:#2b5cff}
+main{max-width:1000px;margin:16px auto;padding:0 12px}
+.layout{display:grid;grid-template-columns:230px 1fr;gap:12px}
+@media(max-width:700px){.layout{grid-template-columns:1fr}}
+.card{background:#fff;border-radius:12px;padding:14px;box-shadow:0 1px 4px #0001}
+.list button{display:block;width:100%;text-align:right;margin-bottom:6px;background:#eef1f8;color:#1f2937}
+.list button.active{background:#2b5cff;color:#fff}
+label{display:block;font-weight:600;margin:12px 0 4px}
+input[type=text],input[type=url],input[type=password],textarea,select{width:100%;font:inherit;padding:8px;border:1px solid #cbd2e0;border-radius:8px;background:#fff}
+textarea{min-height:80px}
+.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.field-actions{display:flex;gap:6px;margin-top:4px}
+.field-actions button{padding:2px 8px;font-size:12px}
+table{border-collapse:collapse;width:100%;background:#fff}
+th,td{border:1px solid #d5dbe8;padding:6px 8px;text-align:right;vertical-align:top}
+th{background:#eef1f8;white-space:nowrap}
+.scroll{overflow-x:auto}
+#login{position:fixed;inset:0;background:#2b5cff;display:flex;align-items:center;justify-content:center;z-index:10}
+#login .card{width:300px;text-align:center}
+.hidden{display:none!important}
+.err{color:#e5484d;min-height:20px}
+@media print{header,.layout .list,.noprint{display:none!important}.layout{display:block}body{background:#fff}}
+</style>
+</head>
+<body>
+
+<div id="login">
+  <form class="card" id="loginForm">
+    <h2>כניסה</h2>
+    <input type="password" id="pw" placeholder="סיסמה" autofocus>
+    <p class="err" id="err"></p>
+    <button type="submit">כניסה</button>
+  </form>
+</div>
+
+<div id="app" class="hidden">
+<header>
+  <h1>🔍 בדיקת אתרים</h1>
+  <button id="btnAdd">+ אתר חדש</button>
+  <button id="btnSummary">📊 סיכום</button>
+  <button id="btnFields">⚙ שדות</button>
+  <button id="btnExport">שמירת גיבוי</button>
+  <button id="btnImport">טעינת גיבוי</button>
+  <input type="file" id="file" accept=".json" class="hidden">
+</header>
+<main>
+  <div class="layout">
+    <div class="card list" id="list"></div>
+    <div id="content"></div>
+  </div>
+</main>
+</div>
+
+<script>
+const PASSWORD='moia123';
+const KEY='siteReviewData_v1';
+
+const defaultFields=[
+  {id:'url',label:'כתובת האתר',type:'url'},
+  {id:'ssl',label:'רשת / SSL תקין (https)',type:'yesno'},
+  {id:'rating',label:'ציון (1-10)',type:'text'},
+  {id:'design',label:'עיצוב',type:'textarea'},
+  {id:'mobile',label:'מתאים למובייל',type:'yesno'},
+  {id:'speed',label:'מהירות טעינה',type:'text'},
+  {id:'opinion',label:'חוות דעת כללית',type:'textarea'}
+];
+
+let data=load();
+let selected=null;
+let view='site';
+
+function load(){
+  try{const d=JSON.parse(localStorage.getItem(KEY));if(d&&d.fields&&d.sites)return d}catch(e){}
+  return {fields:defaultFields,sites:[]};
+}
+function save(){localStorage.setItem(KEY,JSON.stringify(data))}
+const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,6);
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+// login
+if(sessionStorage.getItem('ok')==='1')enter();
+document.getElementById('loginForm').onsubmit=e=>{
+  e.preventDefault();
+  if(document.getElementById('pw').value===PASSWORD){sessionStorage.setItem('ok','1');enter()}
+  else document.getElementById('err').textContent='סיסמה שגויה';
+};
+function enter(){
+  document.getElementById('login').classList.add('hidden');
+  document.getElementById('app').classList.remove('hidden');
+  render();
+}
+
+function render(){
+  const list=document.getElementById('list');
+  list.innerHTML='<b>אתרים ('+data.sites.length+')</b><br><br>'+
+    (data.sites.map(s=>`<button data-id="${s.id}" class="${view==='site'&&selected===s.id?'active':''}">${esc(s.name||'ללא שם')}</button>`).join('')||'<small>עוד אין אתרים</small>');
+  list.querySelectorAll('button').forEach(b=>b.onclick=()=>{selected=b.dataset.id;view='site';render()});
+  if(view==='summary')renderSummary();
+  else if(view==='fields')renderFields();
+  else renderSite();
+}
+
+function renderSite(){
+  const c=document.getElementById('content');
+  const s=data.sites.find(x=>x.id===selected);
+  if(!s){c.innerHTML='<div class="card">בחר אתר מהרשימה או לחץ על "אתר חדש".</div>';return}
+  let h=`<div class="card"><label>שם האתר</label><input type="text" id="f_name" value="${esc(s.name)}">`;
+  for(const f of data.fields){
+    const v=s.values[f.id]??'';
+    h+=`<label>${esc(f.label)}</label>`;
+    if(f.type==='textarea')h+=`<textarea data-f="${f.id}">${esc(v)}</textarea>`;
+    else if(f.type==='yesno')h+=`<select data-f="${f.id}">${['','כן','לא','חלקית'].map(o=>`<option ${o===v?'selected':''}>${o}</option>`).join('')}</select>`;
+    else h+=`<input type="${f.type==='url'?'url':'text'}" data-f="${f.id}" value="${esc(v)}">`;
+  }
+  h+=`<div class="row" style="margin-top:16px"><span id="saved" style="color:#16a34a"></span><span style="flex:1"></span><button class="red" id="del">מחיקת האתר</button></div></div>`;
+  c.innerHTML=h;
+  const upd=()=>{save();document.getElementById('saved').textContent='נשמר ✓'};
+  c.querySelector('#f_name').oninput=e=>{s.name=e.target.value;upd();
+    document.querySelector(`#list button[data-id="${s.id}"]`).textContent=s.name||'ללא שם'};
+  c.querySelectorAll('[data-f]').forEach(el=>{el.oninput=el.onchange=()=>{s.values[el.dataset.f]=el.value;upd()}});
+  c.querySelector('#del').onclick=()=>{if(confirm('למחוק את האתר?')){data.sites=data.sites.filter(x=>x!==s);selected=null;save();render()}};
+}
+
+function renderSummary(){
+  const c=document.getElementById('content');
+  let h=`<div class="card"><div class="row noprint"><h2 style="flex:1;margin:0">סיכום כל האתרים</h2><button id="print">הדפסה / PDF</button><button class="sec" id="csv">הורדה לאקסל</button></div><br><div class="scroll"><table><thead><tr><th>#</th><th>שם</th>${data.fields.map(f=>`<th>${esc(f.label)}</th>`).join('')}</tr></thead><tbody>`;
+  data.sites.forEach((s,i)=>{h+=`<tr><td>${i+1}</td><td><b>${esc(s.name)}</b></td>${data.fields.map(f=>`<td>${esc(s.values[f.id]).replace(/\n/g,'<br>')}</td>`).join('')}</tr>`});
+  h+='</tbody></table></div></div>';
+  c.innerHTML=h;
+  c.querySelector('#print').onclick=()=>window.print();
+  c.querySelector('#csv').onclick=()=>{
+    const q=v=>'"'+String(v??'').replace(/"/g,'""')+'"';
+    const rows=[['שם',...data.fields.map(f=>f.label)].map(q).join(',')];
+    data.sites.forEach(s=>rows.push([s.name,...data.fields.map(f=>s.values[f.id])].map(q).join(',')));
+    download('summary.csv','\ufeff'+rows.join('\r\n'),'text/csv');
+  };
+}
+
+function renderFields(){
+  const c=document.getElementById('content');
+  let h='<div class="card"><h2 style="margin-top:0">ניהול שורות נתונים</h2>';
+  data.fields.forEach((f,i)=>{h+=`<div class="row" style="margin-bottom:6px"><span style="flex:1">${esc(f.label)} <small>(${{text:'טקסט',textarea:'טקסט ארוך',yesno:'כן/לא',url:'קישור'}[f.type]})</small></span><button class="sec" data-up="${i}">▲</button><button class="sec" data-dn="${i}">▼</button><button class="red" data-rm="${i}">מחק</button></div>`});
+  h+=`<hr><label>הוספת שורה חדשה</label><input type="text" id="nl" placeholder="שם הנתון"><label>סוג</label><select id="nt"><option value="text">טקסט קצר</option><option value="textarea">טקסט ארוך</option><option value="yesno">כן / לא</option><option value="url">קישור</option></select><br><br><button id="addf">הוסף</button></div>`;
+  c.innerHTML=h;
+  c.querySelectorAll('[data-up]').forEach(b=>b.onclick=()=>{const i=+b.dataset.up;if(i>0){[data.fields[i-1],data.fields[i]]=[data.fields[i],data.fields[i-1]];save();render()}});
+  c.querySelectorAll('[data-dn]').forEach(b=>b.onclick=()=>{const i=+b.dataset.dn;if(i<data.fields.length-1){[data.fields[i+1],data.fields[i]]=[data.fields[i],data.fields[i+1]];save();render()}});
+  c.querySelectorAll('[data-rm]').forEach(b=>b.onclick=()=>{if(confirm('למחוק שורה זו מכל האתרים?')){data.fields.splice(+b.dataset.rm,1);save();render()}});
+  c.querySelector('#addf').onclick=()=>{const l=c.querySelector('#nl').value.trim();if(!l)return;data.fields.push({id:uid(),label:l,type:c.querySelector('#nt').value});save();render()};
+}
+
+function download(name,text,type){
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(new Blob([text],{type}));a.download=name;a.click();
+}
+
+btnAdd.onclick=()=>{const s={id:uid(),name:'אתר חדש',values:{}};data.sites.push(s);selected=s.id;view='site';save();render()};
+btnSummary.onclick=()=>{view='summary';render()};
+btnFields.onclick=()=>{view='fields';render()};
+btnExport.onclick=()=>download('sites-backup.json',JSON.stringify(data,null,1),'application/json');
+btnImport.onclick=()=>file.click();
+file.onchange=async()=>{
+  try{const d=JSON.parse(await file.files[0].text());if(!d.fields||!d.sites)throw 0;data=d;save();selected=null;view='site';render()}
+  catch(e){alert('קובץ לא תקין')}
+  file.value='';
+};
+</script>
+</body>
+</html>
