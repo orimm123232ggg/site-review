@@ -2,159 +2,406 @@
 <html lang="he" dir="rtl">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#ffffff">
 <title>בדיקת אתרים</title>
 <style>
-*{box-sizing:border-box}
-body{margin:0;font-family:Segoe UI,Arial,sans-serif;background:#f3f5f9;color:#1f2937}
-header{background:#2b5cff;color:#fff;padding:12px 16px;display:flex;flex-wrap:wrap;gap:8px;align-items:center}
-header h1{font-size:20px;margin:0;flex:1}
-button{font:inherit;cursor:pointer;border:0;border-radius:8px;padding:8px 14px;background:#2b5cff;color:#fff}
-button.sec{background:#e5e9f2;color:#1f2937}
-button.red{background:#e5484d}
-header button{background:#fff;color:#2b5cff}
-main{max-width:1000px;margin:16px auto;padding:0 12px}
-.layout{display:grid;grid-template-columns:230px 1fr;gap:12px}
-@media(max-width:700px){.layout{grid-template-columns:1fr}}
-.card{background:#fff;border-radius:12px;padding:14px;box-shadow:0 1px 4px #0001}
-.list button{display:block;width:100%;text-align:right;margin-bottom:6px;background:#eef1f8;color:#1f2937}
-.list button.active{background:#2b5cff;color:#fff}
-label{display:block;font-weight:600;margin:12px 0 4px}
-input[type=text],input[type=url],input[type=password],textarea,select{width:100%;font:inherit;padding:8px;border:1px solid #cbd2e0;border-radius:8px;background:#fff}
-textarea{min-height:80px}
-.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
-.field-actions{display:flex;gap:6px;margin-top:4px}
-.field-actions button{padding:2px 8px;font-size:12px}
-table{border-collapse:collapse;width:100%;background:#fff}
-th,td{border:1px solid #d5dbe8;padding:6px 8px;text-align:right;vertical-align:top}
-th{background:#eef1f8;white-space:nowrap}
-.scroll{overflow-x:auto}
-#login{position:fixed;inset:0;background:#2b5cff;display:flex;align-items:center;justify-content:center;z-index:10}
-#login .card{width:300px;text-align:center}
+:root{
+  --bg:#f5f7fb;--surface:#ffffff;--surface2:#eef1f8;--line:#dde3f0;
+  --text:#1b2237;--muted:#6b7490;
+  --accent:#5b5bf0;--accent2:#06b6d4;--ok:#059669;--bad:#e11d48;--warn:#d97706;
+  --r:18px;--hh:64px;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html{color-scheme:light}
+body{margin:0;min-height:100vh;font-family:"Segoe UI Variable","Segoe UI",system-ui,-apple-system,Arial,sans-serif;color:var(--text);
+  background:radial-gradient(900px 500px at 85% -10%,#5b5bf01f,transparent 60%),radial-gradient(700px 400px at 0% 0%,#06b6d41a,transparent 60%),var(--bg);
+  background-attachment:fixed}
 .hidden{display:none!important}
-.err{color:#e5484d;min-height:20px}
-@media print{header,.layout .list,.noprint{display:none!important}.layout{display:block}body{background:#fff}}
+
+/* header */
+header{position:sticky;top:0;z-index:5;backdrop-filter:blur(18px) saturate(1.4);-webkit-backdrop-filter:blur(18px) saturate(1.4);
+  background:#ffffffd9;border-bottom:1px solid var(--line);padding:10px 14px;padding-top:calc(10px + env(safe-area-inset-top))}
+.bar{max-width:1000px;margin:auto;display:flex;align-items:center;gap:8px}
+.brand{all:unset;cursor:pointer;display:flex;align-items:center;gap:10px;flex:1;min-width:0;font-size:20px;font-weight:700;letter-spacing:-.3px;white-space:nowrap}
+.brand .logo{width:36px;height:36px;border-radius:12px;display:grid;place-items:center;font-size:18px;flex:0 0 auto;
+  background:linear-gradient(135deg,var(--accent),var(--accent2));box-shadow:0 6px 18px #5b5bf044;color:#fff}
+.brand:focus-visible{outline:2px solid var(--accent2);outline-offset:4px;border-radius:10px}
+nav{display:flex;gap:8px}
+
+/* buttons */
+button,a.btn{font:inherit;cursor:pointer;border-radius:14px;padding:10px 16px;min-height:44px;color:var(--text);text-decoration:none;
+  background:var(--surface2);border:1px solid var(--line);transition:transform .15s,background .2s,box-shadow .2s;display:inline-flex;align-items:center;justify-content:center;gap:6px}
+button:hover,a.btn:hover{background:#e3e8f5}
+button:active,a.btn:active{transform:scale(.97)}
+button:focus-visible,a.btn:focus-visible{outline:2px solid var(--accent2);outline-offset:2px}
+button.primary{border:0;background:linear-gradient(135deg,var(--accent),#4f8cff);box-shadow:0 6px 18px #5b5bf044;font-weight:600;color:#fff}
+button.primary:hover{background:linear-gradient(135deg,var(--accent),#4f8cff);box-shadow:0 8px 24px #5b5bf066}
+button.red{background:#e11d4814;border-color:#e11d4844;color:var(--bad)}
+
+/* floating add button (mobile) */
+#fab{position:fixed;z-index:6;left:18px;bottom:calc(18px + env(safe-area-inset-bottom));width:62px;height:62px;border-radius:50%;
+  font-size:30px;padding:0;display:none;box-shadow:0 10px 28px #5b5bf077}
+
+main{max-width:1000px;margin:16px auto;padding:0 14px calc(100px + env(safe-area-inset-bottom))}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:18px;box-shadow:0 8px 30px #1b223714}
+h2{margin:0 0 4px;font-size:24px;letter-spacing:-.4px}
+.sub{color:var(--muted);margin:0 0 18px}
+
+/* list */
+.search{position:relative;margin-bottom:12px}
+.search input[type=search]{padding-right:44px}
+.search span{position:absolute;right:14px;top:50%;transform:translateY(-50%);color:var(--muted);pointer-events:none}
+.grid{display:flex;flex-direction:column;gap:8px}
+.site{border-radius:14px;background:var(--surface);border:1px solid var(--line);transition:border-color .2s,box-shadow .2s;box-shadow:0 1px 3px #1b22370d;scroll-margin-top:calc(var(--hh) + 10px)}
+.site:hover{border-color:#5b5bf088}
+.site.open{border-color:var(--accent);box-shadow:0 10px 30px #5b5bf01f}
+.head{all:unset;box-sizing:border-box;display:flex;align-items:center;gap:12px;width:100%;cursor:pointer;padding:12px 16px;min-height:64px}
+.head .info{flex:1;min-width:0}
+.head .arrow{color:var(--muted);transition:transform .2s;font-size:13px}
+.site.open .arrow{transform:rotate(180deg)}
+.head .chips{margin:0;justify-content:flex-end}
+.head:focus-visible{outline:2px solid var(--accent2);border-radius:var(--r)}
+.site h3{margin:0 0 2px;font-size:17px}
+.site p{margin:0;color:var(--muted);font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.body{padding:0 16px 16px;border-top:1px solid var(--line)}
+.foot{display:flex;gap:8px;align-items:center;margin-top:22px;flex-wrap:wrap}
+.foot .close{flex:1}
+.seg{display:flex;gap:6px}
+.seg button{flex:1;min-height:46px;padding:6px 4px;font-size:15px}
+.seg button.on{font-weight:600}
+.seg button.on.v-yes{background:#05966922;color:var(--ok);border-color:#05966966}
+.seg button.on.v-no{background:#e11d4822;color:var(--bad);border-color:#e11d4866}
+.seg button.on.v-mid{background:#d9770622;color:var(--warn);border-color:#d9770666}
+.score{display:grid;grid-template-columns:repeat(10,1fr);gap:4px}
+.score button{min-height:46px;padding:0;font-size:16px}
+.score button.on{background:linear-gradient(135deg,var(--accent),#4f8cff);color:#fff;border-color:transparent;font-weight:700}
+.tel{display:flex;gap:8px}
+.tel input{flex:1}
+.chips{display:flex;gap:6px;flex-wrap:wrap;margin-top:12px}
+.chip{font-size:12px;padding:3px 10px;border-radius:99px;background:var(--surface2);border:1px solid var(--line);color:var(--muted);white-space:nowrap}
+.chip.ok{color:var(--ok);border-color:#05966955;background:#0596691a}
+.chip.bad{color:var(--bad);border-color:#e11d4855;background:#e11d481a}
+.chip.mid{color:var(--warn);border-color:#d9770655;background:#d977061a}
+.empty{text-align:center;padding:48px 16px;color:var(--muted)}
+.empty .big{font-size:48px}
+
+#modal{position:fixed;inset:0;z-index:20;background:#1b223766;backdrop-filter:blur(6px);display:grid;place-items:center;padding:16px}
+#modal .card{width:min(420px,100%)}
+
+/* form */
+label{display:block;font-weight:600;margin:16px 0 6px;font-size:14px;color:#3a4260}
+input[type=text],input[type=url],input[type=tel],input[type=search],input[type=password],textarea,select{width:100%;font:inherit;font-size:16px;color:var(--text);
+  padding:12px 14px;border:1px solid var(--line);border-radius:14px;background:#fff;transition:border-color .2s,box-shadow .2s;-webkit-appearance:none;appearance:none}
+input:focus,textarea:focus,select:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 4px #5b5bf033}
+textarea{min-height:96px;resize:vertical}
+::placeholder{color:#a3abc4}
+.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.formgrid{display:grid;grid-template-columns:1fr 1fr;gap:0 16px}
+.formgrid .full{grid-column:1/-1}
+.saved{color:var(--ok);font-size:14px}
+
+/* summary */
+.scroll{overflow-x:auto;border-radius:14px;border:1px solid var(--line);background:#fff}
+table{border-collapse:collapse;width:100%;min-width:600px}
+th,td{padding:10px 12px;text-align:right;vertical-align:top;border-bottom:1px solid var(--line);font-size:14px}
+th{background:var(--surface2);color:var(--muted);white-space:nowrap}
+tr:last-child td{border-bottom:0}
+tbody tr:hover{background:#5b5bf00d}
+.scards{display:none;flex-direction:column;gap:10px}
+.scard h3{margin:0 0 10px;font-size:18px}
+.scard dl{margin:0;display:grid;grid-template-columns:auto 1fr;gap:6px 12px;font-size:14px}
+.scard dt{color:var(--muted)}
+.scard dd{margin:0;white-space:pre-wrap;word-break:break-word}
+
+/* login */
+#login{position:fixed;inset:0;z-index:10;display:grid;place-items:center;padding:20px;
+  background:radial-gradient(800px 500px at 80% 0%,#5b5bf033,transparent 60%),radial-gradient(600px 400px at 10% 100%,#06b6d426,transparent 60%),var(--bg)}
+#login .card{width:min(360px,100%);text-align:center;padding:28px}
+#login .logo{width:60px;height:60px;border-radius:20px;margin:0 auto 14px;display:grid;place-items:center;font-size:28px;background:linear-gradient(135deg,var(--accent),var(--accent2));box-shadow:0 10px 26px #5b5bf055;color:#fff}
+#login button{width:100%;margin-top:8px}
+.err{color:var(--bad);min-height:22px;margin:8px 0 0}
+
+@media(max-width:700px){
+  :root{--hh:58px}
+  header{padding:8px 12px;padding-top:calc(8px + env(safe-area-inset-top))}
+  .brand{font-size:18px;gap:8px}
+  .brand .logo{width:32px;height:32px;font-size:16px}
+  #btnAdd{display:none}
+  nav button{padding:0;width:44px}
+  nav .txt{display:none}
+  #fab{display:inline-flex}
+  main{margin-top:12px;padding:0 10px calc(100px + env(safe-area-inset-bottom))}
+  .formgrid{grid-template-columns:1fr}
+  .head{flex-wrap:wrap;padding:12px 14px}
+  .head .chips{order:3;width:100%;justify-content:flex-start}
+  .body{padding:0 14px 14px}
+  h2{font-size:21px}
+  .card{padding:14px}
+  .score{grid-template-columns:repeat(5,1fr)}
+  .scroll{display:none}
+  .scards{display:flex}
+}
+@media(prefers-reduced-motion:reduce){*{transition:none!important;scroll-behavior:auto!important}}
+@media print{
+  body{background:#fff;color:#000}header,#fab,.noprint{display:none!important}
+  .scroll{display:block!important;border-color:#ccc}.scards{display:none!important}
+  th,td{color:#000;background:#fff}
+}
 </style>
 </head>
 <body>
 
 <div id="login">
   <form class="card" id="loginForm">
-    <h2>כניסה</h2>
-    <input type="password" id="pw" placeholder="סיסמה" autofocus>
+    <div class="logo">🔍</div>
+    <h2>בדיקת אתרים</h2>
+    <p class="sub">הכנס סיסמה כדי להמשיך</p>
+    <input type="password" id="pw" placeholder="סיסמה" autocomplete="current-password" autofocus>
     <p class="err" id="err"></p>
-    <button type="submit">כניסה</button>
+    <button type="submit" class="primary">כניסה</button>
   </form>
 </div>
 
 <div id="app" class="hidden">
 <header>
-  <h1>🔍 בדיקת אתרים</h1>
-  <button id="btnAdd">+ אתר חדש</button>
-  <button id="btnSummary">📊 סיכום</button>
-  <button id="btnFields">⚙ שדות</button>
-  <button id="btnExport">שמירת גיבוי</button>
-  <button id="btnImport">טעינת גיבוי</button>
-  <input type="file" id="file" accept=".json" class="hidden">
-</header>
-<main>
-  <div class="layout">
-    <div class="card list" id="list"></div>
-    <div id="content"></div>
+  <div class="bar">
+    <button class="brand" id="btnHome" aria-label="חזרה למסך הראשי"><span class="logo">🔍</span><span>בדיקת אתרים</span></button>
+    <nav>
+      <button id="btnAdd" class="primary">＋ אתר חדש</button>
+      <button id="btnSummary" aria-label="סיכום">📊<span class="txt"> סיכום</span></button>
+      <button id="btnFields" aria-label="ניהול שדות">⚙<span class="txt"> שדות</span></button>
+    </nav>
   </div>
-</main>
+</header>
+<main id="content"></main>
+<button id="fab" class="primary" aria-label="הוספת אתר חדש">＋</button>
+</div>
+
+<div id="modal" class="hidden">
+  <form class="card" id="addForm">
+    <h2>אתר חדש</h2>
+    <label for="newName">שם האתר</label>
+    <input type="text" id="newName" placeholder="לדוגמה: אולם הנשיא" autocomplete="off" enterkeyhint="next">
+    <label for="newAddr">כתובת</label>
+    <input type="text" id="newAddr" placeholder="רחוב, עיר" autocomplete="off" enterkeyhint="done">
+    <div class="row" style="margin-top:20px"><button type="submit" class="primary" style="flex:1">שמור</button><button type="button" id="cancelAdd">ביטול</button></div>
+  </form>
 </div>
 
 <script>
 const PASSWORD='moia123';
-const KEY='siteReviewData_v1';
+const KEY='siteReviewData_v2';
 
 const defaultFields=[
-  {id:'url',label:'כתובת האתר',type:'url'},
-  {id:'ssl',label:'רשת / SSL תקין (https)',type:'yesno'},
-  {id:'rating',label:'ציון (1-10)',type:'text'},
-  {id:'design',label:'עיצוב',type:'textarea'},
-  {id:'mobile',label:'מתאים למובייל',type:'yesno'},
-  {id:'speed',label:'מהירות טעינה',type:'text'},
+  {id:'address',label:'כתובת / מיקום',type:'location'},
+  {id:'contact',label:'איש קשר / טלפון',type:'tel'},
+  {id:'network',label:'רשת תקינה',type:'yesno'},
+  {id:'cell',label:'קליטה סלולרית',type:'yesno'},
+  {id:'wifi',label:'Wi-Fi / אינטרנט',type:'yesno'},
+  {id:'power',label:'חשמל',type:'yesno'},
+  {id:'parking',label:'חניה',type:'yesno'},
+  {id:'access',label:'נגישות',type:'yesno'},
+  {id:'rating',label:'ציון (1-10)',type:'score'},
+  {id:'issues',label:'ליקויים / בעיות',type:'textarea'},
   {id:'opinion',label:'חוות דעת כללית',type:'textarea'}
 ];
+const TYPES={text:'טקסט קצר',textarea:'טקסט ארוך',yesno:'כן / לא',score:'ציון 1-10',tel:'טלפון',url:'קישור',location:'מיקום'};
 
 let data=load();
-let selected=null;
-let view='site';
+let view='home';
+let openId=null;
+let query='';
 
 function load(){
-  try{const d=JSON.parse(localStorage.getItem(KEY));if(d&&d.fields&&d.sites)return d}catch(e){}
+  try{
+    const d=JSON.parse(localStorage.getItem(KEY));
+    if(d&&d.fields&&d.sites){
+      // upgrade older saved field types
+      for(const f of d.fields){
+        if(f.id==='rating'&&f.type==='text')f.type='score';
+        if(f.id==='contact'&&f.type==='text')f.type='tel';
+      }
+      return d;
+    }
+  }catch(e){}
   return {fields:defaultFields,sites:[]};
 }
 function save(){localStorage.setItem(KEY,JSON.stringify(data))}
 const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,6);
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const $=id=>document.getElementById(id);
 
-// login
-if(sessionStorage.getItem('ok')==='1')enter();
-document.getElementById('loginForm').onsubmit=e=>{
+/* ---------- login ---------- */
+$('loginForm').onsubmit=e=>{
   e.preventDefault();
-  if(document.getElementById('pw').value===PASSWORD){sessionStorage.setItem('ok','1');enter()}
-  else document.getElementById('err').textContent='סיסמה שגויה';
+  if($('pw').value===PASSWORD){sessionStorage.setItem('ok','1');enter()}
+  else $('err').textContent='סיסמה שגויה';
 };
 function enter(){
-  document.getElementById('login').classList.add('hidden');
-  document.getElementById('app').classList.remove('hidden');
+  $('login').classList.add('hidden');
+  $('app').classList.remove('hidden');
   render();
 }
 
+function go(v){view=v;render();window.scrollTo({top:0})}
 function render(){
-  const list=document.getElementById('list');
-  list.innerHTML='<b>אתרים ('+data.sites.length+')</b><br><br>'+
-    (data.sites.map(s=>`<button data-id="${s.id}" class="${view==='site'&&selected===s.id?'active':''}">${esc(s.name||'ללא שם')}</button>`).join('')||'<small>עוד אין אתרים</small>');
-  list.querySelectorAll('button').forEach(b=>b.onclick=()=>{selected=b.dataset.id;view='site';render()});
+  $('fab').classList.toggle('hidden',view!=='home');
   if(view==='summary')renderSummary();
   else if(view==='fields')renderFields();
-  else renderSite();
+  else renderHome();
 }
 
-function renderSite(){
-  const c=document.getElementById('content');
-  const s=data.sites.find(x=>x.id===selected);
-  if(!s){c.innerHTML='<div class="card">בחר אתר מהרשימה או לחץ על "אתר חדש".</div>';return}
-  let h=`<div class="card"><label>שם האתר</label><input type="text" id="f_name" value="${esc(s.name)}">`;
-  for(const f of data.fields){
-    const v=s.values[f.id]??'';
-    h+=`<label>${esc(f.label)}</label>`;
-    if(f.type==='textarea')h+=`<textarea data-f="${f.id}">${esc(v)}</textarea>`;
-    else if(f.type==='yesno')h+=`<select data-f="${f.id}">${['','כן','לא','חלקית'].map(o=>`<option ${o===v?'selected':''}>${o}</option>`).join('')}</select>`;
-    else h+=`<input type="${f.type==='url'?'url':'text'}" data-f="${f.id}" value="${esc(v)}">`;
+/* ---------- helpers ---------- */
+const chip=(label,v)=>{
+  if(!v)return '';
+  const cls=v==='כן'?'ok':v==='לא'?'bad':'mid';
+  return `<span class="chip ${cls}">${esc(label)}: ${esc(v)}</span>`;
+};
+function chipsFor(s){
+  return chip('רשת',s.values.network)+chip('סלולר',s.values.cell)+chip('Wi-Fi',s.values.wifi)+(s.values.rating?`<span class="chip">⭐ ${esc(s.values.rating)}</span>`:'');
+}
+const yn=[['כן','yes'],['לא','no'],['חלקית','mid']];
+const telHref=v=>'tel:'+String(v).replace(/[^\d+]/g,'');
+
+function fieldHtml(s,f){
+  const v=s.values[f.id]??'';
+  const full=(f.type==='textarea'||f.type==='location'||f.type==='score')?' full':'';
+  let h=`<div class="${full}"><label>${esc(f.label)}</label>`;
+  switch(f.type){
+    case 'location':
+      h+=`<input type="text" data-f="${f.id}" value="${esc(v)}" placeholder="כתובת או קואורדינטות"><div class="row" style="margin-top:8px"><button type="button" data-gps="${f.id}">📍 המיקום שלי</button><button type="button" data-map="${f.id}">🗺 פתח במפה</button></div>`;break;
+    case 'textarea':
+      h+=`<textarea data-f="${f.id}">${esc(v)}</textarea>`;break;
+    case 'yesno':
+      h+=`<div class="seg" role="group" aria-label="${esc(f.label)}" data-seg="${f.id}">${yn.map(([o,c])=>`<button type="button" class="v-${c} ${v===o?'on':''}" data-val="${o}" aria-pressed="${v===o}">${o}</button>`).join('')}</div>`;break;
+    case 'score':
+      h+=`<div class="score" role="group" aria-label="${esc(f.label)}" data-seg="${f.id}">${[1,2,3,4,5,6,7,8,9,10].map(n=>`<button type="button" class="${String(n)===String(v)?'on':''}" data-val="${n}" aria-pressed="${String(n)===String(v)}">${n}</button>`).join('')}</div>`;break;
+    case 'tel':
+      h+=`<div class="tel"><input type="tel" inputmode="tel" autocomplete="off" data-f="${f.id}" value="${esc(v)}" placeholder="שם / מספר"><a class="btn" data-call="${f.id}" href="${v?telHref(v):'#'}" aria-label="התקשר">📞</a></div>`;break;
+    case 'url':
+      h+=`<input type="url" inputmode="url" data-f="${f.id}" value="${esc(v)}">`;break;
+    default:
+      h+=`<input type="text" data-f="${f.id}" value="${esc(v)}">`;
   }
-  h+=`<div class="row" style="margin-top:16px"><span id="saved" style="color:#16a34a"></span><span style="flex:1"></span><button class="red" id="del">מחיקת האתר</button></div></div>`;
-  c.innerHTML=h;
-  const upd=()=>{save();document.getElementById('saved').textContent='נשמר ✓'};
-  c.querySelector('#f_name').oninput=e=>{s.name=e.target.value;upd();
-    document.querySelector(`#list button[data-id="${s.id}"]`).textContent=s.name||'ללא שם'};
-  c.querySelectorAll('[data-f]').forEach(el=>{el.oninput=el.onchange=()=>{s.values[el.dataset.f]=el.value;upd()}});
-  c.querySelector('#del').onclick=()=>{if(confirm('למחוק את האתר?')){data.sites=data.sites.filter(x=>x!==s);selected=null;save();render()}};
+  return h+'</div>';
 }
 
+/* ---------- home ---------- */
+function renderHome(){
+  const c=$('content');
+  const n=data.sites.length;
+  const q=query.trim().toLowerCase();
+  const list=q?data.sites.filter(s=>(s.name+' '+(s.values.address||'')).toLowerCase().includes(q)):data.sites;
+  let h=`<div class="row" style="margin-bottom:12px"><h2 style="flex:1;margin:0">האתרים שלי <span class="chip">${n}</span></h2></div>`;
+  if(n)h+=`<div class="search"><span>🔍</span><input type="search" id="q" placeholder="חיפוש לפי שם או כתובת" value="${esc(query)}" aria-label="חיפוש"></div>`;
+  if(!n)h+=`<div class="card empty"><div class="big">📍</div><p>עוד לא הוספת אתרים</p><button class="primary" id="addEmpty">＋ הוסף אתר ראשון</button></div>`;
+  else if(!list.length)h+=`<div class="card empty"><p>לא נמצאו אתרים</p></div>`;
+  else{
+    h+='<div class="grid">';
+    for(const s of list){
+      const isOpen=openId===s.id;
+      h+=`<div class="site ${isOpen?'open':''}" data-id="${s.id}"><button class="head" data-toggle aria-expanded="${isOpen}"><div class="info"><h3 data-t="name">${esc(s.name||'ללא שם')}</h3><p data-t="addr">${esc(s.values.address||'ללא כתובת')}</p></div><div class="chips" data-t="chips">${chipsFor(s)}</div><span class="arrow">▼</span></button>`;
+      if(isOpen){
+        h+=`<div class="body"><label>שם האתר</label><input type="text" data-name value="${esc(s.name)}"><div class="formgrid">${data.fields.map(f=>fieldHtml(s,f)).join('')}</div>
+        <div class="foot"><button class="primary close" data-close>✓ סגור</button><span class="saved" aria-live="polite"></span><button class="red" data-del>מחק</button></div></div>`;
+      }
+      h+='</div>';
+    }
+    h+='</div>';
+  }
+  c.innerHTML=h;
+
+  const qi=$('q');
+  if(qi)qi.oninput=()=>{query=qi.value;const pos=qi.selectionStart;renderHome();const n2=$('q');n2.focus();n2.setSelectionRange(pos,pos)};
+  const ae=c.querySelector('#addEmpty');if(ae)ae.onclick=openAdd;
+
+  c.querySelectorAll('.site').forEach(card=>{
+    const s=data.sites.find(x=>x.id===card.dataset.id);
+    card.querySelector('[data-toggle]').onclick=()=>toggle(s.id);
+    if(openId!==s.id)return;
+
+    const sv=card.querySelector('.saved');
+    const refresh=()=>{
+      card.querySelector('[data-t=name]').textContent=s.name||'ללא שם';
+      card.querySelector('[data-t=addr]').textContent=s.values.address||'ללא כתובת';
+      card.querySelector('[data-t=chips]').innerHTML=chipsFor(s);
+    };
+    const upd=()=>{save();refresh();sv.textContent='נשמר ✓';clearTimeout(sv._t);sv._t=setTimeout(()=>sv.textContent='',1500)};
+
+    card.querySelector('[data-name]').oninput=e=>{s.name=e.target.value;upd()};
+    card.querySelectorAll('input[data-f],textarea[data-f]').forEach(el=>el.oninput=()=>{
+      s.values[el.dataset.f]=el.value;upd();
+      const call=card.querySelector(`[data-call="${el.dataset.f}"]`);
+      if(call)call.href=el.value?telHref(el.value):'#';
+    });
+    card.querySelectorAll('[data-seg]').forEach(seg=>seg.querySelectorAll('button').forEach(b=>b.onclick=()=>{
+      const id=seg.dataset.seg;
+      s.values[id]=String(s.values[id])===b.dataset.val?'':b.dataset.val;
+      seg.querySelectorAll('button').forEach(x=>{const on=x.dataset.val===String(s.values[id]);x.classList.toggle('on',on);x.setAttribute('aria-pressed',on)});
+      upd();
+    }));
+    card.querySelectorAll('[data-call]').forEach(a=>a.onclick=e=>{if(a.getAttribute('href')==='#')e.preventDefault()});
+    card.querySelectorAll('[data-gps]').forEach(b=>b.onclick=()=>{
+      if(!navigator.geolocation)return alert('המכשיר לא תומך במיקום');
+      b.textContent='מאתר...';
+      navigator.geolocation.getCurrentPosition(p=>{
+        const el=card.querySelector(`[data-f="${b.dataset.gps}"]`);
+        el.value=p.coords.latitude.toFixed(6)+', '+p.coords.longitude.toFixed(6);
+        s.values[b.dataset.gps]=el.value;upd();b.textContent='📍 המיקום שלי';
+      },()=>{b.textContent='📍 המיקום שלי';alert('לא הצלחתי לקבל מיקום. בדוק שהמיקום מופעל והרשאה ניתנה.')},{enableHighAccuracy:true,timeout:15000});
+    });
+    card.querySelectorAll('[data-map]').forEach(b=>b.onclick=()=>{
+      const v=card.querySelector(`[data-f="${b.dataset.map}"]`).value.trim();
+      if(v)window.open('https://www.google.com/maps/search/?api=1&query='+encodeURIComponent(v),'_blank');
+    });
+    card.querySelector('[data-close]').onclick=()=>toggle(s.id);
+    card.querySelector('[data-del]').onclick=()=>{if(confirm('למחוק את האתר?')){data.sites=data.sites.filter(x=>x!==s);openId=null;save();render()}};
+  });
+}
+
+function toggle(id){
+  openId=openId===id?null:id;
+  renderHome();
+  const el=document.querySelector(`.site[data-id="${id}"]`);
+  if(el)el.scrollIntoView({behavior:'smooth',block:'start'});
+}
+
+/* ---------- summary ---------- */
 function renderSummary(){
-  const c=document.getElementById('content');
-  let h=`<div class="card"><div class="row noprint"><h2 style="flex:1;margin:0">סיכום כל האתרים</h2><button id="print">הדפסה / PDF</button><button class="sec" id="csv">הורדה לאקסל</button></div><br><div class="scroll"><table><thead><tr><th>#</th><th>שם</th>${data.fields.map(f=>`<th>${esc(f.label)}</th>`).join('')}</tr></thead><tbody>`;
-  data.sites.forEach((s,i)=>{h+=`<tr><td>${i+1}</td><td><b>${esc(s.name)}</b></td>${data.fields.map(f=>`<td>${esc(s.values[f.id]).replace(/\n/g,'<br>')}</td>`).join('')}</tr>`});
-  h+='</tbody></table></div></div>';
+  const c=$('content');
+  const val=(s,f)=>esc(s.values[f.id]);
+  let h=`<div class="row noprint" style="margin-bottom:14px"><div style="flex:1;min-width:160px"><h2>סיכום כל האתרים</h2><p class="sub" style="margin:0">${data.sites.length} אתרים</p></div><button id="print">🖨 PDF</button><button id="csv">⬇ אקסל</button></div>`;
+  // desktop table
+  h+=`<div class="scroll"><table><thead><tr><th>#</th><th>שם</th>${data.fields.map(f=>`<th>${esc(f.label)}</th>`).join('')}</tr></thead><tbody>`;
+  data.sites.forEach((s,i)=>{h+=`<tr><td>${i+1}</td><td><b>${esc(s.name)}</b></td>${data.fields.map(f=>`<td>${val(s,f).replace(/\n/g,'<br>')}</td>`).join('')}</tr>`});
+  if(!data.sites.length)h+=`<tr><td colspan="${data.fields.length+2}" style="text-align:center;color:var(--muted)">אין אתרים עדיין</td></tr>`;
+  h+='</tbody></table></div>';
+  // mobile cards
+  h+='<div class="scards">';
+  if(!data.sites.length)h+='<div class="card empty"><p>אין אתרים עדיין</p></div>';
+  data.sites.forEach((s,i)=>{
+    const rows=data.fields.filter(f=>s.values[f.id]).map(f=>`<dt>${esc(f.label)}</dt><dd>${val(s,f)}</dd>`).join('');
+    h+=`<div class="card scard"><h3>${i+1}. ${esc(s.name||'ללא שם')}</h3>${rows?`<dl>${rows}</dl>`:'<p class="sub" style="margin:0">עוד לא מולאו נתונים</p>'}</div>`;
+  });
+  h+='</div>';
   c.innerHTML=h;
   c.querySelector('#print').onclick=()=>window.print();
   c.querySelector('#csv').onclick=()=>{
     const q=v=>'"'+String(v??'').replace(/"/g,'""')+'"';
     const rows=[['שם',...data.fields.map(f=>f.label)].map(q).join(',')];
     data.sites.forEach(s=>rows.push([s.name,...data.fields.map(f=>s.values[f.id])].map(q).join(',')));
-    download('summary.csv','\ufeff'+rows.join('\r\n'),'text/csv');
+    const a=document.createElement('a');
+    a.href=URL.createObjectURL(new Blob(['\ufeff'+rows.join('\r\n')],{type:'text/csv'}));a.download='summary.csv';a.click();
   };
 }
 
+/* ---------- fields ---------- */
 function renderFields(){
-  const c=document.getElementById('content');
-  let h='<div class="card"><h2 style="margin-top:0">ניהול שורות נתונים</h2>';
-  data.fields.forEach((f,i)=>{h+=`<div class="row" style="margin-bottom:6px"><span style="flex:1">${esc(f.label)} <small>(${{text:'טקסט',textarea:'טקסט ארוך',yesno:'כן/לא',url:'קישור'}[f.type]})</small></span><button class="sec" data-up="${i}">▲</button><button class="sec" data-dn="${i}">▼</button><button class="red" data-rm="${i}">מחק</button></div>`});
-  h+=`<hr><label>הוספת שורה חדשה</label><input type="text" id="nl" placeholder="שם הנתון"><label>סוג</label><select id="nt"><option value="text">טקסט קצר</option><option value="textarea">טקסט ארוך</option><option value="yesno">כן / לא</option><option value="url">קישור</option></select><br><br><button id="addf">הוסף</button></div>`;
+  const c=$('content');
+  let h='<div class="card"><h2>שורות נתונים</h2><p class="sub">הוסף, מחק או סדר מחדש את השדות שממלאים לכל אתר</p>';
+  data.fields.forEach((f,i)=>{h+=`<div class="row" style="margin-bottom:8px;flex-wrap:nowrap"><span style="flex:1;min-width:0">${esc(f.label)} <span class="chip">${TYPES[f.type]||''}</span></span><button data-up="${i}" aria-label="הזז למעלה" style="padding:0;width:44px">▲</button><button data-dn="${i}" aria-label="הזז למטה" style="padding:0;width:44px">▼</button><button class="red" data-rm="${i}" aria-label="מחק" style="padding:0;width:44px">✕</button></div>`});
+  h+=`<hr style="border:0;border-top:1px solid var(--line);margin:20px 0"><label for="nl">הוספת שורה חדשה</label><input type="text" id="nl" placeholder="שם הנתון"><label for="nt">סוג</label><select id="nt">${Object.entries(TYPES).filter(([k])=>k!=='location').map(([k,l])=>`<option value="${k}">${l}</option>`).join('')}</select><div style="margin-top:16px"><button class="primary" id="addf">＋ הוסף</button></div></div>`;
   c.innerHTML=h;
   c.querySelectorAll('[data-up]').forEach(b=>b.onclick=()=>{const i=+b.dataset.up;if(i>0){[data.fields[i-1],data.fields[i]]=[data.fields[i],data.fields[i-1]];save();render()}});
   c.querySelectorAll('[data-dn]').forEach(b=>b.onclick=()=>{const i=+b.dataset.dn;if(i<data.fields.length-1){[data.fields[i+1],data.fields[i]]=[data.fields[i],data.fields[i+1]];save();render()}});
@@ -162,21 +409,34 @@ function renderFields(){
   c.querySelector('#addf').onclick=()=>{const l=c.querySelector('#nl').value.trim();if(!l)return;data.fields.push({id:uid(),label:l,type:c.querySelector('#nt').value});save();render()};
 }
 
-function download(name,text,type){
-  const a=document.createElement('a');
-  a.href=URL.createObjectURL(new Blob([text],{type}));a.download=name;a.click();
+/* ---------- add dialog ---------- */
+function openAdd(){
+  $('newName').value='';$('newAddr').value='';
+  $('modal').classList.remove('hidden');
+  setTimeout(()=>$('newName').focus(),50);
 }
-
-btnAdd.onclick=()=>{const s={id:uid(),name:'אתר חדש',values:{}};data.sites.push(s);selected=s.id;view='site';save();render()};
-btnSummary.onclick=()=>{view='summary';render()};
-btnFields.onclick=()=>{view='fields';render()};
-btnExport.onclick=()=>download('sites-backup.json',JSON.stringify(data,null,1),'application/json');
-btnImport.onclick=()=>file.click();
-file.onchange=async()=>{
-  try{const d=JSON.parse(await file.files[0].text());if(!d.fields||!d.sites)throw 0;data=d;save();selected=null;view='site';render()}
-  catch(e){alert('קובץ לא תקין')}
-  file.value='';
+function closeAdd(){$('modal').classList.add('hidden')}
+$('cancelAdd').onclick=closeAdd;
+$('modal').onclick=e=>{if(e.target.id==='modal')closeAdd()};
+document.addEventListener('keydown',e=>{if(e.key==='Escape')closeAdd()});
+$('newName').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();$('newAddr').focus()}});
+$('addForm').onsubmit=e=>{
+  e.preventDefault();
+  const name=$('newName').value.trim(),addr=$('newAddr').value.trim();
+  if(!name&&!addr){$('newName').focus();return}
+  const s={id:uid(),name:name||addr,values:addr?{address:addr}:{}};
+  data.sites.unshift(s);save();closeAdd();
+  query='';view='home';openId=null;
+  toggle(s.id);
 };
+
+$('btnHome').onclick=()=>{openId=null;query='';go('home')};
+$('btnAdd').onclick=openAdd;
+$('fab').onclick=openAdd;
+$('btnSummary').onclick=()=>go('summary');
+$('btnFields').onclick=()=>go('fields');
+
+if(sessionStorage.getItem('ok')==='1')enter();
 </script>
 </body>
 </html>
