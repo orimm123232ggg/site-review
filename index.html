@@ -23,9 +23,13 @@ body{margin:0;min-height:100vh;font-family:"Segoe UI Variable","Segoe UI",system
 header{position:sticky;top:0;z-index:5;backdrop-filter:blur(18px) saturate(1.4);-webkit-backdrop-filter:blur(18px) saturate(1.4);
   background:#ffffffd9;border-bottom:1px solid var(--line);padding:10px 14px;padding-top:calc(10px + env(safe-area-inset-top))}
 .bar{max-width:1000px;margin:auto;display:flex;align-items:center;gap:8px}
-.brand{all:unset;cursor:pointer;display:flex;align-items:center;gap:10px;flex:1;min-width:0;font-size:20px;font-weight:700;letter-spacing:-.3px;white-space:nowrap}
+.brand{all:unset;cursor:pointer;display:flex;align-items:center;gap:10px;flex:1;min-width:0}
 .brand .logo{width:36px;height:36px;border-radius:12px;display:grid;place-items:center;font-size:18px;flex:0 0 auto;
   background:linear-gradient(135deg,var(--accent),var(--accent2));box-shadow:0 6px 18px #5b5bf044;color:#fff}
+.brand .names{display:flex;flex-direction:column;min-width:0;line-height:1.15}
+.brand b{font-size:20px;font-weight:700;letter-spacing:-.3px;white-space:nowrap}
+.sync{font-size:12px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sync.ok{color:var(--ok)}.sync.err{color:var(--bad)}.sync.wait{color:var(--warn)}
 .brand:focus-visible{outline:2px solid var(--accent2);outline-offset:4px;border-radius:10px}
 nav{display:flex;gap:8px}
 
@@ -38,8 +42,8 @@ button:focus-visible,a.btn:focus-visible{outline:2px solid var(--accent2);outlin
 button.primary{border:0;background:linear-gradient(135deg,var(--accent),#4f8cff);box-shadow:0 6px 18px #5b5bf044;font-weight:600;color:#fff}
 button.primary:hover{background:linear-gradient(135deg,var(--accent),#4f8cff);box-shadow:0 8px 24px #5b5bf066}
 button.red{background:#e11d4814;border-color:#e11d4844;color:var(--bad)}
+button:disabled{opacity:.6;cursor:wait}
 
-/* floating add button (mobile) */
 #fab{position:fixed;z-index:6;left:18px;bottom:calc(18px + env(safe-area-inset-bottom));width:62px;height:62px;border-radius:50%;
   font-size:30px;padding:0;display:none;box-shadow:0 10px 28px #5b5bf077}
 
@@ -125,7 +129,8 @@ tbody tr:hover{background:#5b5bf00d}
 @media(max-width:700px){
   :root{--hh:58px}
   header{padding:8px 12px;padding-top:calc(8px + env(safe-area-inset-top))}
-  .brand{font-size:18px;gap:8px}
+  .brand{gap:8px}
+  .brand b{font-size:18px}
   .brand .logo{width:32px;height:32px;font-size:16px}
   #btnAdd{display:none}
   nav button{padding:0;width:44px}
@@ -158,15 +163,15 @@ tbody tr:hover{background:#5b5bf00d}
     <h2>בדיקת אתרים</h2>
     <p class="sub">הכנס סיסמה כדי להמשיך</p>
     <input type="password" id="pw" placeholder="סיסמה" autocomplete="current-password" autofocus>
-    <p class="err" id="err"></p>
-    <button type="submit" class="primary">כניסה</button>
+    <p class="err" id="err" role="alert"></p>
+    <button type="submit" class="primary" id="loginBtn">כניסה</button>
   </form>
 </div>
 
 <div id="app" class="hidden">
 <header>
   <div class="bar">
-    <button class="brand" id="btnHome" aria-label="חזרה למסך הראשי"><span class="logo">🔍</span><span>בדיקת אתרים</span></button>
+    <button class="brand" id="btnHome" aria-label="חזרה למסך הראשי"><span class="logo">🔍</span><span class="names"><b>בדיקת אתרים</b><span class="sync" id="sync" aria-live="polite"></span></span></button>
     <nav>
       <button id="btnAdd" class="primary">＋ אתר חדש</button>
       <button id="btnSummary" aria-label="סיכום">📊<span class="txt"> סיכום</span></button>
@@ -190,8 +195,13 @@ tbody tr:hover{background:#5b5bf00d}
 </div>
 
 <script>
-const PASSWORD='moia123';
-const KEY='siteReviewData_v2';
+/* ====== config ====== */
+const REPO='orimm123232ggg/site-review-data';
+const FILE='data.json';
+// GitHub token encrypted with the site password (AES-GCM + PBKDF2).
+const VAULT={"s":"4aJBOjzL+7s0RJ2i8LgHKg==","i":"1FZV69gtF34PoMBm","n":200000,"c":"RPKsFmA0aOoTauX9+uGNKOw7Tka3CwRs0o6p3bWqMb8idniYFNPcxmgBJe/FaSFpGksu0U78l//ZgoTWBV+zM6htFX8ZPQZHqF6qE0Nb8bE9AfiJ+6j6aZi9IzrzRTtKGkuDs1sGYgfEd14l8w=="};
+
+const KEY='siteReviewData_v3', OLDKEY='siteReviewData_v2';
 
 const defaultFields=[
   {id:'address',label:'כתובת / מיקום',type:'location'},
@@ -208,40 +218,154 @@ const defaultFields=[
 ];
 const TYPES={text:'טקסט קצר',textarea:'טקסט ארוך',yesno:'כן / לא',score:'ציון 1-10',tel:'טלפון',url:'קישור',location:'מיקום'};
 
-let data=load();
-let view='home';
-let openId=null;
-let query='';
+const $=id=>document.getElementById(id);
+const clone=o=>JSON.parse(JSON.stringify(o));
+const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,6);
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 
+/* ====== data model ======
+   data = {fields, fts, sites:[{id, c(created), name, values{}, ts{key:time}, deleted}]}
+   Every change stamps a per-key time so edits from different devices merge cleanly. */
+let token=localStorage.getItem('srToken')||null;
+let dirty=localStorage.getItem('srDirty')==='1';
+let editVer=0;
+let data=load();
+let view='home', openId=null, query='';
+
+function normalize(d){
+  if(!d||!Array.isArray(d.sites))throw new Error('bad data');
+  if(!Array.isArray(d.fields))d.fields=clone(defaultFields);
+  d.fts=d.fts||0;
+  for(const s of d.sites){s.values=s.values||{};s.ts=s.ts||{};s.c=s.c||0;s.name=s.name||''}
+  for(const f of d.fields){
+    if(f.id==='rating'&&f.type==='text')f.type='score';
+    if(f.id==='contact'&&f.type==='text')f.type='tel';
+  }
+  return d;
+}
 function load(){
+  try{const d=JSON.parse(localStorage.getItem(KEY));if(d)return normalize(d)}catch(e){}
+  // migrate the previous local-only version
   try{
-    const d=JSON.parse(localStorage.getItem(KEY));
-    if(d&&d.fields&&d.sites){
-      // upgrade older saved field types
-      for(const f of d.fields){
-        if(f.id==='rating'&&f.type==='text')f.type='score';
-        if(f.id==='contact'&&f.type==='text')f.type='tel';
-      }
+    const o=JSON.parse(localStorage.getItem(OLDKEY));
+    if(o&&Array.isArray(o.sites)){
+      const now=Date.now();
+      const d=normalize({fields:o.fields,fts:now,sites:o.sites.map((s,i)=>{
+        const ts={name:now};for(const k in (s.values||{}))ts[k]=now;
+        return {id:s.id,c:now-i,name:s.name||'',values:s.values||{},ts};
+      })});
+      dirty=true;localStorage.setItem('srDirty','1');
+      localStorage.setItem(KEY,JSON.stringify(d));
       return d;
     }
   }catch(e){}
-  return {fields:defaultFields,sites:[]};
+  return {fields:clone(defaultFields),fts:0,sites:[]};
 }
 function save(){localStorage.setItem(KEY,JSON.stringify(data))}
-const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,6);
-const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-const $=id=>document.getElementById(id);
+function markDirty(){dirty=true;editVer++;localStorage.setItem('srDirty','1');save();schedulePush()}
+function touch(s,k){s.ts[k]=Date.now();markDirty()}
+function fieldsChanged(){data.fts=Date.now();markDirty()}
+const live=()=>data.sites.filter(s=>!s.deleted).sort((a,b)=>b.c-a.c);
 
-/* ---------- login ---------- */
-$('loginForm').onsubmit=e=>{
+// Apply newer remote changes into local data IN PLACE (keeps UI handlers valid). Returns true if anything changed.
+function mergeInto(L,R){
+  let changed=false;
+  if((R.fts||0)>(L.fts||0)){L.fields=R.fields;L.fts=R.fts;changed=true}
+  for(const r of R.sites){
+    const l=L.sites.find(x=>x.id===r.id);
+    if(!l){L.sites.push(r);changed=true;continue}
+    for(const k in r.ts){
+      if((r.ts[k]||0)>(l.ts[k]||0)){
+        l.ts[k]=r.ts[k];changed=true;
+        if(k==='name')l.name=r.name;
+        else if(k==='deleted')l.deleted=r.deleted;
+        else if(r.values[k]===undefined)delete l.values[k];
+        else l.values[k]=r.values[k];
+      }
+    }
+  }
+  return changed;
+}
+
+/* ====== GitHub sync ====== */
+let syncing=false, syncAgain=false, pushTimer=null, pendingRender=false;
+const b64enc=str=>{const b=new TextEncoder().encode(str);let s='';for(let i=0;i<b.length;i+=0x8000)s+=String.fromCharCode.apply(null,b.subarray(i,i+0x8000));return btoa(s)};
+const b64dec=s=>new TextDecoder().decode(Uint8Array.from(atob(s.replace(/\s/g,'')),c=>c.charCodeAt(0)));
+
+function setStatus(st){
+  const el=$('sync');if(!el)return;
+  const m={ok:['☁ נשמר בענן','ok'],wait:['⏳ שומר…','wait'],offline:['📴 אין חיבור · נשמר במכשיר','wait'],err:['⚠ שגיאת סנכרון · נשמר במכשיר','err'],auth:['⚠ אין הרשאה לענן','err'],local:['📱 נשמר במכשיר בלבד','']}[st];
+  el.textContent=m[0];el.className='sync '+m[1];
+}
+function schedulePush(){if(!token)return;setStatus('wait');clearTimeout(pushTimer);pushTimer=setTimeout(sync,1200)}
+
+async function gh(method,body){
+  const url=`https://api.github.com/repos/${REPO}/contents/${FILE}`+(method==='GET'?`?t=${Date.now()}`:'');
+  return fetch(url,{method,cache:'no-store',headers:{Authorization:'Bearer '+token,Accept:'application/vnd.github+json',...(body?{'Content-Type':'application/json'}:{})},body:body?JSON.stringify(body):undefined});
+}
+
+async function sync(){
+  if(!token)return;
+  if(syncing){syncAgain=true;return}
+  syncing=true;clearTimeout(pushTimer);
+  try{
+    let done=false;
+    for(let attempt=0;attempt<4&&!done;attempt++){
+      const r=await gh('GET');
+      if(r.status===401||r.status===403){setStatus('auth');return}
+      let remote=null,sha=null;
+      if(r.ok){const j=await r.json();sha=j.sha;remote=normalize(JSON.parse(b64dec(j.content)))}
+      else if(r.status!==404)throw new Error('GET '+r.status);
+      if(remote&&mergeInto(data,remote)){save();refreshUI()}
+      if(dirty||!remote){
+        const v=editVer;
+        const p=await gh('PUT',{message:'update '+new Date().toISOString(),content:b64enc(JSON.stringify(data)),...(sha?{sha}:{})});
+        if(p.status===409||p.status===422)continue; // someone else saved first: re-read and merge
+        if(p.status===401||p.status===403){setStatus('auth');return}
+        if(!p.ok)throw new Error('PUT '+p.status);
+        if(editVer===v){dirty=false;localStorage.removeItem('srDirty')}
+      }
+      done=true;
+    }
+    setStatus(done&&!dirty?'ok':dirty?'wait':'err');
+  }catch(e){
+    setStatus(navigator.onLine===false?'offline':'err');
+  }finally{
+    syncing=false;
+    if(syncAgain){syncAgain=false;sync()}
+  }
+}
+const typing=()=>{const a=document.activeElement;return a&&$('content').contains(a)&&/^(INPUT|TEXTAREA)$/.test(a.tagName)};
+function refreshUI(){if(typing()){pendingRender=true;return}pendingRender=false;render()}
+document.addEventListener('focusout',()=>setTimeout(()=>{if(pendingRender&&!typing())refreshUI()},0));
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')sync()});
+window.addEventListener('online',()=>sync());
+setInterval(()=>{if(document.visibilityState==='visible')sync()},30000);
+
+/* ====== login ====== */
+async function decryptToken(pw){
+  if(!window.crypto||!crypto.subtle)throw new Error('insecure');
+  const b=s=>Uint8Array.from(atob(s),c=>c.charCodeAt(0));
+  const base=await crypto.subtle.importKey('raw',new TextEncoder().encode(pw),'PBKDF2',false,['deriveKey']);
+  const key=await crypto.subtle.deriveKey({name:'PBKDF2',salt:b(VAULT.s),iterations:VAULT.n,hash:'SHA-256'},base,{name:'AES-GCM',length:256},false,['decrypt']);
+  return new TextDecoder().decode(await crypto.subtle.decrypt({name:'AES-GCM',iv:b(VAULT.i)},key,b(VAULT.c)));
+}
+$('loginForm').onsubmit=async e=>{
   e.preventDefault();
-  if($('pw').value===PASSWORD){sessionStorage.setItem('ok','1');enter()}
-  else $('err').textContent='סיסמה שגויה';
+  const pw=$('pw').value;$('err').textContent='';
+  if(VAULT){
+    $('loginBtn').disabled=true;$('loginBtn').textContent='בודק…';
+    try{token=await decryptToken(pw);localStorage.setItem('srToken',token);enter()}
+    catch(x){$('err').textContent=x.message==='insecure'?'יש לפתוח את האתר בכתובת https':'סיסמה שגויה'}
+    $('loginBtn').disabled=false;$('loginBtn').textContent='כניסה';
+  }
 };
 function enter(){
   $('login').classList.add('hidden');
   $('app').classList.remove('hidden');
+  setStatus(token?(dirty?'wait':'ok'):'local');
   render();
+  sync();
 }
 
 function go(v){view=v;render();window.scrollTo({top:0})}
@@ -252,7 +376,7 @@ function render(){
   else renderHome();
 }
 
-/* ---------- helpers ---------- */
+/* ====== helpers ====== */
 const chip=(label,v)=>{
   if(!v)return '';
   const cls=v==='כן'?'ok':v==='לא'?'bad':'mid';
@@ -287,12 +411,13 @@ function fieldHtml(s,f){
   return h+'</div>';
 }
 
-/* ---------- home ---------- */
+/* ====== home ====== */
 function renderHome(){
   const c=$('content');
-  const n=data.sites.length;
+  const all=live();
+  const n=all.length;
   const q=query.trim().toLowerCase();
-  const list=q?data.sites.filter(s=>(s.name+' '+(s.values.address||'')).toLowerCase().includes(q)):data.sites;
+  const list=q?all.filter(s=>(s.name+' '+(s.values.address||'')).toLowerCase().includes(q)):all;
   let h=`<div class="row" style="margin-bottom:12px"><h2 style="flex:1;margin:0">האתרים שלי <span class="chip">${n}</span></h2></div>`;
   if(n)h+=`<div class="search"><span>🔍</span><input type="search" id="q" placeholder="חיפוש לפי שם או כתובת" value="${esc(query)}" aria-label="חיפוש"></div>`;
   if(!n)h+=`<div class="card empty"><div class="big">📍</div><p>עוד לא הוספת אתרים</p><button class="primary" id="addEmpty">＋ הוסף אתר ראשון</button></div>`;
@@ -327,11 +452,11 @@ function renderHome(){
       card.querySelector('[data-t=addr]').textContent=s.values.address||'ללא כתובת';
       card.querySelector('[data-t=chips]').innerHTML=chipsFor(s);
     };
-    const upd=()=>{save();refresh();sv.textContent='נשמר ✓';clearTimeout(sv._t);sv._t=setTimeout(()=>sv.textContent='',1500)};
+    const upd=k=>{touch(s,k);refresh();sv.textContent='נשמר ✓';clearTimeout(sv._t);sv._t=setTimeout(()=>sv.textContent='',1500)};
 
-    card.querySelector('[data-name]').oninput=e=>{s.name=e.target.value;upd()};
+    card.querySelector('[data-name]').oninput=e=>{s.name=e.target.value;upd('name')};
     card.querySelectorAll('input[data-f],textarea[data-f]').forEach(el=>el.oninput=()=>{
-      s.values[el.dataset.f]=el.value;upd();
+      s.values[el.dataset.f]=el.value;upd(el.dataset.f);
       const call=card.querySelector(`[data-call="${el.dataset.f}"]`);
       if(call)call.href=el.value?telHref(el.value):'#';
     });
@@ -339,7 +464,7 @@ function renderHome(){
       const id=seg.dataset.seg;
       s.values[id]=String(s.values[id])===b.dataset.val?'':b.dataset.val;
       seg.querySelectorAll('button').forEach(x=>{const on=x.dataset.val===String(s.values[id]);x.classList.toggle('on',on);x.setAttribute('aria-pressed',on)});
-      upd();
+      upd(id);
     }));
     card.querySelectorAll('[data-call]').forEach(a=>a.onclick=e=>{if(a.getAttribute('href')==='#')e.preventDefault()});
     card.querySelectorAll('[data-gps]').forEach(b=>b.onclick=()=>{
@@ -348,7 +473,7 @@ function renderHome(){
       navigator.geolocation.getCurrentPosition(p=>{
         const el=card.querySelector(`[data-f="${b.dataset.gps}"]`);
         el.value=p.coords.latitude.toFixed(6)+', '+p.coords.longitude.toFixed(6);
-        s.values[b.dataset.gps]=el.value;upd();b.textContent='📍 המיקום שלי';
+        s.values[b.dataset.gps]=el.value;upd(b.dataset.gps);b.textContent='📍 המיקום שלי';
       },()=>{b.textContent='📍 המיקום שלי';alert('לא הצלחתי לקבל מיקום. בדוק שהמיקום מופעל והרשאה ניתנה.')},{enableHighAccuracy:true,timeout:15000});
     });
     card.querySelectorAll('[data-map]').forEach(b=>b.onclick=()=>{
@@ -356,7 +481,7 @@ function renderHome(){
       if(v)window.open('https://www.google.com/maps/search/?api=1&query='+encodeURIComponent(v),'_blank');
     });
     card.querySelector('[data-close]').onclick=()=>toggle(s.id);
-    card.querySelector('[data-del]').onclick=()=>{if(confirm('למחוק את האתר?')){data.sites=data.sites.filter(x=>x!==s);openId=null;save();render()}};
+    card.querySelector('[data-del]').onclick=()=>{if(confirm('למחוק את האתר?')){s.deleted=true;openId=null;touch(s,'deleted');render()}};
   });
 }
 
@@ -367,20 +492,18 @@ function toggle(id){
   if(el)el.scrollIntoView({behavior:'smooth',block:'start'});
 }
 
-/* ---------- summary ---------- */
+/* ====== summary ====== */
 function renderSummary(){
   const c=$('content');
+  const sites=live();
   const val=(s,f)=>esc(s.values[f.id]);
-  let h=`<div class="row noprint" style="margin-bottom:14px"><div style="flex:1;min-width:160px"><h2>סיכום כל האתרים</h2><p class="sub" style="margin:0">${data.sites.length} אתרים</p></div><button id="print">🖨 PDF</button><button id="csv">⬇ אקסל</button></div>`;
-  // desktop table
+  let h=`<div class="row noprint" style="margin-bottom:14px"><div style="flex:1;min-width:160px"><h2>סיכום כל האתרים</h2><p class="sub" style="margin:0">${sites.length} אתרים</p></div><button id="print">🖨 PDF</button><button id="csv">⬇ אקסל</button></div>`;
   h+=`<div class="scroll"><table><thead><tr><th>#</th><th>שם</th>${data.fields.map(f=>`<th>${esc(f.label)}</th>`).join('')}</tr></thead><tbody>`;
-  data.sites.forEach((s,i)=>{h+=`<tr><td>${i+1}</td><td><b>${esc(s.name)}</b></td>${data.fields.map(f=>`<td>${val(s,f).replace(/\n/g,'<br>')}</td>`).join('')}</tr>`});
-  if(!data.sites.length)h+=`<tr><td colspan="${data.fields.length+2}" style="text-align:center;color:var(--muted)">אין אתרים עדיין</td></tr>`;
-  h+='</tbody></table></div>';
-  // mobile cards
-  h+='<div class="scards">';
-  if(!data.sites.length)h+='<div class="card empty"><p>אין אתרים עדיין</p></div>';
-  data.sites.forEach((s,i)=>{
+  sites.forEach((s,i)=>{h+=`<tr><td>${i+1}</td><td><b>${esc(s.name)}</b></td>${data.fields.map(f=>`<td>${val(s,f).replace(/\n/g,'<br>')}</td>`).join('')}</tr>`});
+  if(!sites.length)h+=`<tr><td colspan="${data.fields.length+2}" style="text-align:center;color:var(--muted)">אין אתרים עדיין</td></tr>`;
+  h+='</tbody></table></div><div class="scards">';
+  if(!sites.length)h+='<div class="card empty"><p>אין אתרים עדיין</p></div>';
+  sites.forEach((s,i)=>{
     const rows=data.fields.filter(f=>s.values[f.id]).map(f=>`<dt>${esc(f.label)}</dt><dd>${val(s,f)}</dd>`).join('');
     h+=`<div class="card scard"><h3>${i+1}. ${esc(s.name||'ללא שם')}</h3>${rows?`<dl>${rows}</dl>`:'<p class="sub" style="margin:0">עוד לא מולאו נתונים</p>'}</div>`;
   });
@@ -390,26 +513,27 @@ function renderSummary(){
   c.querySelector('#csv').onclick=()=>{
     const q=v=>'"'+String(v??'').replace(/"/g,'""')+'"';
     const rows=[['שם',...data.fields.map(f=>f.label)].map(q).join(',')];
-    data.sites.forEach(s=>rows.push([s.name,...data.fields.map(f=>s.values[f.id])].map(q).join(',')));
+    sites.forEach(s=>rows.push([s.name,...data.fields.map(f=>s.values[f.id])].map(q).join(',')));
     const a=document.createElement('a');
     a.href=URL.createObjectURL(new Blob(['\ufeff'+rows.join('\r\n')],{type:'text/csv'}));a.download='summary.csv';a.click();
   };
 }
 
-/* ---------- fields ---------- */
+/* ====== fields ====== */
 function renderFields(){
   const c=$('content');
   let h='<div class="card"><h2>שורות נתונים</h2><p class="sub">הוסף, מחק או סדר מחדש את השדות שממלאים לכל אתר</p>';
   data.fields.forEach((f,i)=>{h+=`<div class="row" style="margin-bottom:8px;flex-wrap:nowrap"><span style="flex:1;min-width:0">${esc(f.label)} <span class="chip">${TYPES[f.type]||''}</span></span><button data-up="${i}" aria-label="הזז למעלה" style="padding:0;width:44px">▲</button><button data-dn="${i}" aria-label="הזז למטה" style="padding:0;width:44px">▼</button><button class="red" data-rm="${i}" aria-label="מחק" style="padding:0;width:44px">✕</button></div>`});
   h+=`<hr style="border:0;border-top:1px solid var(--line);margin:20px 0"><label for="nl">הוספת שורה חדשה</label><input type="text" id="nl" placeholder="שם הנתון"><label for="nt">סוג</label><select id="nt">${Object.entries(TYPES).filter(([k])=>k!=='location').map(([k,l])=>`<option value="${k}">${l}</option>`).join('')}</select><div style="margin-top:16px"><button class="primary" id="addf">＋ הוסף</button></div></div>`;
   c.innerHTML=h;
-  c.querySelectorAll('[data-up]').forEach(b=>b.onclick=()=>{const i=+b.dataset.up;if(i>0){[data.fields[i-1],data.fields[i]]=[data.fields[i],data.fields[i-1]];save();render()}});
-  c.querySelectorAll('[data-dn]').forEach(b=>b.onclick=()=>{const i=+b.dataset.dn;if(i<data.fields.length-1){[data.fields[i+1],data.fields[i]]=[data.fields[i],data.fields[i+1]];save();render()}});
-  c.querySelectorAll('[data-rm]').forEach(b=>b.onclick=()=>{if(confirm('למחוק שורה זו מכל האתרים?')){data.fields.splice(+b.dataset.rm,1);save();render()}});
-  c.querySelector('#addf').onclick=()=>{const l=c.querySelector('#nl').value.trim();if(!l)return;data.fields.push({id:uid(),label:l,type:c.querySelector('#nt').value});save();render()};
+  const F=()=>data.fields;
+  c.querySelectorAll('[data-up]').forEach(b=>b.onclick=()=>{const i=+b.dataset.up;if(i>0){[F()[i-1],F()[i]]=[F()[i],F()[i-1]];fieldsChanged();render()}});
+  c.querySelectorAll('[data-dn]').forEach(b=>b.onclick=()=>{const i=+b.dataset.dn;if(i<F().length-1){[F()[i+1],F()[i]]=[F()[i],F()[i+1]];fieldsChanged();render()}});
+  c.querySelectorAll('[data-rm]').forEach(b=>b.onclick=()=>{if(confirm('למחוק שורה זו מכל האתרים?')){F().splice(+b.dataset.rm,1);fieldsChanged();render()}});
+  c.querySelector('#addf').onclick=()=>{const l=c.querySelector('#nl').value.trim();if(!l)return;F().push({id:uid(),label:l,type:c.querySelector('#nt').value});fieldsChanged();render()};
 }
 
-/* ---------- add dialog ---------- */
+/* ====== add dialog ====== */
 function openAdd(){
   $('newName').value='';$('newAddr').value='';
   $('modal').classList.remove('hidden');
@@ -424,8 +548,9 @@ $('addForm').onsubmit=e=>{
   e.preventDefault();
   const name=$('newName').value.trim(),addr=$('newAddr').value.trim();
   if(!name&&!addr){$('newName').focus();return}
-  const s={id:uid(),name:name||addr,values:addr?{address:addr}:{}};
-  data.sites.unshift(s);save();closeAdd();
+  const now=Date.now();
+  const s={id:uid(),c:now,name:name||addr,values:addr?{address:addr}:{},ts:addr?{name:now,address:now}:{name:now}};
+  data.sites.push(s);markDirty();closeAdd();
   query='';view='home';openId=null;
   toggle(s.id);
 };
@@ -436,7 +561,7 @@ $('fab').onclick=openAdd;
 $('btnSummary').onclick=()=>go('summary');
 $('btnFields').onclick=()=>go('fields');
 
-if(sessionStorage.getItem('ok')==='1')enter();
+if(token||(!VAULT&&localStorage.getItem('srOk')==='1'))enter();
 </script>
 </body>
 </html>
