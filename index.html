@@ -57,10 +57,22 @@ h2{margin:0 0 4px;font-size:24px;letter-spacing:-.4px}
 .search input[type=search]{padding-right:44px}
 .search span{position:absolute;right:14px;top:50%;transform:translateY(-50%);color:var(--muted);pointer-events:none}
 .grid{display:flex;flex-direction:column;gap:8px}
+.chips:empty{display:none}
+.agroup{margin-bottom:10px;scroll-margin-top:calc(var(--hh) + 10px)}
+.area{display:flex;gap:6px;align-items:stretch}
+.ahead{all:unset;box-sizing:border-box;flex:1;min-width:0;display:flex;align-items:center;gap:10px;min-height:54px;padding:0 14px;cursor:pointer;border-radius:14px;
+  background:linear-gradient(135deg,#5b5bf014,#06b6d414);border:1px solid var(--line);font-weight:700;font-size:17px;transition:border-color .2s}
+.ahead:hover{border-color:#5b5bf088}
+.ahead:focus-visible{outline:2px solid var(--accent2)}
+.ahead .aname{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ahead .arrow{color:var(--muted);transition:transform .2s;font-size:13px;transform:rotate(-90deg)}
+.agroup.open .ahead .arrow{transform:none}
+.aicon{width:54px;min-height:54px;padding:0;font-size:20px;flex:0 0 auto}
+.nested{margin-top:8px;margin-inline-start:6px;padding-inline-start:10px;border-inline-start:3px solid #5b5bf033}
 .site{border-radius:14px;background:var(--surface);border:1px solid var(--line);transition:border-color .2s,box-shadow .2s;box-shadow:0 1px 3px #1b22370d;scroll-margin-top:calc(var(--hh) + 10px)}
 .site:hover{border-color:#5b5bf088}
 .site.open{border-color:var(--accent);box-shadow:0 10px 30px #5b5bf01f}
-.head{all:unset;box-sizing:border-box;display:flex;align-items:center;gap:12px;width:100%;cursor:pointer;padding:12px 16px;min-height:64px}
+.head{all:unset;box-sizing:border-box;display:flex;align-items:center;gap:12px;width:100%;cursor:pointer;padding:10px 16px;min-height:56px}
 .head .info{flex:1;min-width:0}
 .head .arrow{color:var(--muted);transition:transform .2s;font-size:13px}
 .site.open .arrow{transform:rotate(180deg)}
@@ -90,8 +102,8 @@ h2{margin:0 0 4px;font-size:24px;letter-spacing:-.4px}
 .empty{text-align:center;padding:48px 16px;color:var(--muted)}
 .empty .big{font-size:48px}
 
-#modal{position:fixed;inset:0;z-index:20;background:#1b223766;backdrop-filter:blur(6px);display:grid;place-items:center;padding:16px}
-#modal .card{width:min(420px,100%)}
+#modal,#amodal{position:fixed;inset:0;z-index:20;background:#1b223766;backdrop-filter:blur(6px);display:grid;place-items:center;padding:16px}
+#modal .card,#amodal .card{width:min(420px,100%)}
 
 /* form */
 label{display:block;font-weight:600;margin:16px 0 6px;font-size:14px;color:#3a4260}
@@ -186,11 +198,23 @@ tbody tr:hover{background:#5b5bf00d}
 <div id="modal" class="hidden">
   <form class="card" id="addForm">
     <h2>אתר חדש</h2>
-    <label for="newName">שם האתר</label>
-    <input type="text" id="newName" placeholder="לדוגמה: אולם הנשיא" autocomplete="off" enterkeyhint="next">
-    <label for="newAddr">כתובת</label>
+    <label for="newName">שם האתר / העיר</label>
+    <input type="text" id="newName" placeholder="לדוגמה: חיפה" autocomplete="off" enterkeyhint="done">
+    <label for="newArea">אזור</label>
+    <select id="newArea"></select>
+    <label for="newAddr">כתובת (לא חובה)</label>
     <input type="text" id="newAddr" placeholder="רחוב, עיר" autocomplete="off" enterkeyhint="done">
     <div class="row" style="margin-top:20px"><button type="submit" class="primary" style="flex:1">שמור</button><button type="button" id="cancelAdd">ביטול</button></div>
+  </form>
+</div>
+
+<div id="amodal" class="hidden">
+  <form class="card" id="areaForm">
+    <h2 id="areaTitle">אזור חדש</h2>
+    <label for="areaName">שם האזור</label>
+    <input type="text" id="areaName" placeholder="לדוגמה: דרום" autocomplete="off" enterkeyhint="done">
+    <div class="row" style="margin-top:20px"><button type="submit" class="primary" style="flex:1">שמור</button><button type="button" id="areaCancel">ביטול</button></div>
+    <div style="margin-top:12px"><button type="button" class="red hidden" id="areaDel" style="width:100%">מחק אזור</button></div>
   </form>
 </div>
 
@@ -236,7 +260,9 @@ function normalize(d){
   if(!d||!Array.isArray(d.sites))throw new Error('bad data');
   if(!Array.isArray(d.fields))d.fields=clone(defaultFields);
   d.fts=d.fts||0;
-  for(const s of d.sites){s.values=s.values||{};s.ts=s.ts||{};s.c=s.c||0;s.name=s.name||''}
+  if(!Array.isArray(d.areas))d.areas=[];
+  d.ats=d.ats||0;
+  for(const s of d.sites){s.values=s.values||{};s.ts=s.ts||{};s.c=s.c||0;s.name=s.name||'';s.area=s.area||''}
   for(const f of d.fields){
     if(f.id==='rating'&&f.type==='text')f.type='score';
     if(f.id==='contact'&&f.type==='text')f.type='tel';
@@ -259,7 +285,7 @@ function load(){
       return d;
     }
   }catch(e){}
-  return {fields:clone(defaultFields),fts:0,sites:[]};
+  return {fields:clone(defaultFields),fts:0,areas:[],ats:0,sites:[]};
 }
 function save(){localStorage.setItem(KEY,JSON.stringify(data))}
 function markDirty(){dirty=true;editVer++;localStorage.setItem('srDirty','1');save();schedulePush()}
@@ -271,6 +297,7 @@ const live=()=>data.sites.filter(s=>!s.deleted).sort((a,b)=>b.c-a.c);
 function mergeInto(L,R){
   let changed=false;
   if((R.fts||0)>(L.fts||0)){L.fields=R.fields;L.fts=R.fts;changed=true}
+  if((R.ats||0)>(L.ats||0)){L.areas=R.areas;L.ats=R.ats;changed=true}
   for(const r of R.sites){
     const l=L.sites.find(x=>x.id===r.id);
     if(!l){L.sites.push(r);changed=true;continue}
@@ -279,6 +306,7 @@ function mergeInto(L,R){
         l.ts[k]=r.ts[k];changed=true;
         if(k==='name')l.name=r.name;
         else if(k==='deleted')l.deleted=r.deleted;
+        else if(k==='area')l.area=r.area||'';
         else if(r.values[k]===undefined)delete l.values[k];
         else l.values[k]=r.values[k];
       }
@@ -412,34 +440,71 @@ function fieldHtml(s,f){
 }
 
 /* ====== home ====== */
+const OA_KEY='srOpenAreas';
+let openAreas=new Set();
+try{openAreas=new Set(JSON.parse(localStorage.getItem(OA_KEY)||'[]'))}catch(e){}
+const saveOA=()=>localStorage.setItem(OA_KEY,JSON.stringify([...openAreas]));
+const areaOf=s=>data.areas.find(a=>a.id===s.area)||null;
+const byName=(a,b)=>(a.name||'').localeCompare(b.name||'','he');
+
+function groupsFor(list){
+  const g=data.areas.map(a=>({area:a,key:a.id,sites:list.filter(s=>s.area===a.id).sort(byName)}));
+  const none=list.filter(s=>!areaOf(s)).sort(byName);
+  if(none.length)g.push({area:null,key:'',sites:none});
+  return g;
+}
+
+function siteHtml(s){
+  const isOpen=openId===s.id;
+  let h=`<div class="site ${isOpen?'open':''}" data-id="${s.id}"><button class="head" data-toggle aria-expanded="${isOpen}"><div class="info"><h3 data-t="name">${esc(s.name||'ללא שם')}</h3></div><div class="chips" data-t="chips">${chipsFor(s)}</div><span class="arrow">▼</span></button>`;
+  if(isOpen){
+    h+=`<div class="body"><label>שם האתר</label><input type="text" data-name value="${esc(s.name)}">
+    <label>אזור</label><select data-area-sel><option value="">ללא אזור</option>${data.areas.map(a=>`<option value="${a.id}" ${a.id===s.area?'selected':''}>${esc(a.name)}</option>`).join('')}</select>
+    <div class="formgrid">${data.fields.map(f=>fieldHtml(s,f)).join('')}</div>
+    <div class="foot"><button class="primary close" data-close>✓ סגור</button><span class="saved" aria-live="polite"></span><button class="red" data-del>מחק</button></div></div>`;
+  }
+  return h+'</div>';
+}
+
 function renderHome(){
   const c=$('content');
   const all=live();
   const n=all.length;
   const q=query.trim().toLowerCase();
-  const list=q?all.filter(s=>(s.name+' '+(s.values.address||'')).toLowerCase().includes(q)):all;
-  let h=`<div class="row" style="margin-bottom:12px"><h2 style="flex:1;margin:0">האתרים שלי <span class="chip">${n}</span></h2></div>`;
-  if(n)h+=`<div class="search"><span>🔍</span><input type="search" id="q" placeholder="חיפוש לפי שם או כתובת" value="${esc(query)}" aria-label="חיפוש"></div>`;
-  if(!n)h+=`<div class="card empty"><div class="big">📍</div><p>עוד לא הוספת אתרים</p><button class="primary" id="addEmpty">＋ הוסף אתר ראשון</button></div>`;
-  else if(!list.length)h+=`<div class="card empty"><p>לא נמצאו אתרים</p></div>`;
-  else{
-    h+='<div class="grid">';
-    for(const s of list){
-      const isOpen=openId===s.id;
-      h+=`<div class="site ${isOpen?'open':''}" data-id="${s.id}"><button class="head" data-toggle aria-expanded="${isOpen}"><div class="info"><h3 data-t="name">${esc(s.name||'ללא שם')}</h3><p data-t="addr">${esc(s.values.address||'ללא כתובת')}</p></div><div class="chips" data-t="chips">${chipsFor(s)}</div><span class="arrow">▼</span></button>`;
-      if(isOpen){
-        h+=`<div class="body"><label>שם האתר</label><input type="text" data-name value="${esc(s.name)}"><div class="formgrid">${data.fields.map(f=>fieldHtml(s,f)).join('')}</div>
-        <div class="foot"><button class="primary close" data-close>✓ סגור</button><span class="saved" aria-live="polite"></span><button class="red" data-del>מחק</button></div></div>`;
-      }
-      h+='</div>';
+  const list=q?all.filter(s=>(s.name+' '+(s.values.address||'')+' '+((areaOf(s)||{}).name||'')).toLowerCase().includes(q)):all;
+  let h=`<div class="row" style="margin-bottom:12px"><h2 style="flex:1;margin:0">האתרים שלי <span class="chip">${n}</span></h2><button id="addArea">＋ אזור</button></div>`;
+  if(n)h+=`<div class="search"><span>🔍</span><input type="search" id="q" placeholder="חיפוש לפי שם, אזור או כתובת" value="${esc(query)}" aria-label="חיפוש"></div>`;
+  if(!n&&!data.areas.length){
+    h+=`<div class="card empty"><div class="big">📍</div><p>עוד לא הוספת אתרים</p><button class="primary" id="addEmpty">＋ הוסף אתר ראשון</button></div>`;
+  }else{
+    const groups=groupsFor(list).filter(g=>!q||g.sites.length);
+    if(!groups.length)h+=`<div class="card empty"><p>לא נמצאו אתרים</p></div>`;
+    for(const g of groups){
+      const isOpen=q?true:openAreas.has(g.key);
+      h+=`<section class="agroup ${isOpen?'open':''}" data-akey="${g.key}"><div class="area"><button class="ahead" data-atoggle aria-expanded="${isOpen}"><span class="arrow">▼</span><span class="aname">${esc(g.area?g.area.name:'ללא אזור')}</span><span class="chip">${g.sites.length}</span></button><button class="aicon" data-addin aria-label="הוסף אתר לאזור">＋</button>${g.area?`<button class="aicon" data-aedit aria-label="עריכת אזור">✎</button>`:''}</div>`;
+      if(isOpen)h+=`<div class="grid nested">${g.sites.length?g.sites.map(siteHtml).join(''):'<p class="sub" style="margin:8px 0 0">אין אתרים באזור הזה</p>'}</div>`;
+      h+='</section>';
     }
-    h+='</div>';
   }
   c.innerHTML=h;
 
   const qi=$('q');
   if(qi)qi.oninput=()=>{query=qi.value;const pos=qi.selectionStart;renderHome();const n2=$('q');n2.focus();n2.setSelectionRange(pos,pos)};
-  const ae=c.querySelector('#addEmpty');if(ae)ae.onclick=openAdd;
+  const ae=c.querySelector('#addEmpty');if(ae)ae.onclick=()=>openAdd('');
+  c.querySelector('#addArea').onclick=()=>openArea();
+
+  c.querySelectorAll('.agroup').forEach(sec=>{
+    const key=sec.dataset.akey;
+    sec.querySelector('[data-atoggle]').onclick=()=>{
+      if(query.trim())return;
+      if(openAreas.has(key))openAreas.delete(key);else openAreas.add(key);
+      saveOA();renderHome();
+      const el=document.querySelector(`.agroup[data-akey="${key}"]`);
+      if(el&&openAreas.has(key))el.scrollIntoView({behavior:'smooth',block:'start'});
+    };
+    sec.querySelector('[data-addin]').onclick=()=>openAdd(key);
+    const ed=sec.querySelector('[data-aedit]');if(ed)ed.onclick=()=>openArea(key);
+  });
 
   c.querySelectorAll('.site').forEach(card=>{
     const s=data.sites.find(x=>x.id===card.dataset.id);
@@ -449,12 +514,15 @@ function renderHome(){
     const sv=card.querySelector('.saved');
     const refresh=()=>{
       card.querySelector('[data-t=name]').textContent=s.name||'ללא שם';
-      card.querySelector('[data-t=addr]').textContent=s.values.address||'ללא כתובת';
       card.querySelector('[data-t=chips]').innerHTML=chipsFor(s);
     };
     const upd=k=>{touch(s,k);refresh();sv.textContent='נשמר ✓';clearTimeout(sv._t);sv._t=setTimeout(()=>sv.textContent='',1500)};
 
     card.querySelector('[data-name]').oninput=e=>{s.name=e.target.value;upd('name')};
+    card.querySelector('[data-area-sel]').onchange=e=>{
+      s.area=e.target.value;openAreas.add(s.area);saveOA();touch(s,'area');renderHome();
+      const el=document.querySelector(`.site[data-id="${s.id}"]`);if(el)el.scrollIntoView({block:'start'});
+    };
     card.querySelectorAll('input[data-f],textarea[data-f]').forEach(el=>el.oninput=()=>{
       s.values[el.dataset.f]=el.value;upd(el.dataset.f);
       const call=card.querySelector(`[data-call="${el.dataset.f}"]`);
@@ -493,27 +561,32 @@ function toggle(id){
 }
 
 /* ====== summary ====== */
+function ordered(){
+  const idx=a=>{const i=data.areas.findIndex(x=>x.id===a);return i<0?9999:i};
+  return live().sort((a,b)=>idx(a.area)-idx(b.area)||byName(a,b));
+}
 function renderSummary(){
   const c=$('content');
-  const sites=live();
+  const sites=ordered();
   const val=(s,f)=>esc(s.values[f.id]);
+  const an=s=>(areaOf(s)||{}).name||'';
   let h=`<div class="row noprint" style="margin-bottom:14px"><div style="flex:1;min-width:160px"><h2>סיכום כל האתרים</h2><p class="sub" style="margin:0">${sites.length} אתרים</p></div><button id="print">🖨 PDF</button><button id="csv">⬇ אקסל</button></div>`;
-  h+=`<div class="scroll"><table><thead><tr><th>#</th><th>שם</th>${data.fields.map(f=>`<th>${esc(f.label)}</th>`).join('')}</tr></thead><tbody>`;
-  sites.forEach((s,i)=>{h+=`<tr><td>${i+1}</td><td><b>${esc(s.name)}</b></td>${data.fields.map(f=>`<td>${val(s,f).replace(/\n/g,'<br>')}</td>`).join('')}</tr>`});
-  if(!sites.length)h+=`<tr><td colspan="${data.fields.length+2}" style="text-align:center;color:var(--muted)">אין אתרים עדיין</td></tr>`;
+  h+=`<div class="scroll"><table><thead><tr><th>#</th><th>שם</th><th>אזור</th>${data.fields.map(f=>`<th>${esc(f.label)}</th>`).join('')}</tr></thead><tbody>`;
+  sites.forEach((s,i)=>{h+=`<tr><td>${i+1}</td><td><b>${esc(s.name)}</b></td><td>${esc(an(s))}</td>${data.fields.map(f=>`<td>${val(s,f).replace(/\n/g,'<br>')}</td>`).join('')}</tr>`});
+  if(!sites.length)h+=`<tr><td colspan="${data.fields.length+3}" style="text-align:center;color:var(--muted)">אין אתרים עדיין</td></tr>`;
   h+='</tbody></table></div><div class="scards">';
   if(!sites.length)h+='<div class="card empty"><p>אין אתרים עדיין</p></div>';
   sites.forEach((s,i)=>{
     const rows=data.fields.filter(f=>s.values[f.id]).map(f=>`<dt>${esc(f.label)}</dt><dd>${val(s,f)}</dd>`).join('');
-    h+=`<div class="card scard"><h3>${i+1}. ${esc(s.name||'ללא שם')}</h3>${rows?`<dl>${rows}</dl>`:'<p class="sub" style="margin:0">עוד לא מולאו נתונים</p>'}</div>`;
+    h+=`<div class="card scard"><h3>${i+1}. ${esc(s.name||'ללא שם')}</h3>${an(s)?`<p class="sub" style="margin:-6px 0 10px">${esc(an(s))}</p>`:''}${rows?`<dl>${rows}</dl>`:'<p class="sub" style="margin:0">עוד לא מולאו נתונים</p>'}</div>`;
   });
   h+='</div>';
   c.innerHTML=h;
   c.querySelector('#print').onclick=()=>window.print();
   c.querySelector('#csv').onclick=()=>{
     const q=v=>'"'+String(v??'').replace(/"/g,'""')+'"';
-    const rows=[['שם',...data.fields.map(f=>f.label)].map(q).join(',')];
-    sites.forEach(s=>rows.push([s.name,...data.fields.map(f=>s.values[f.id])].map(q).join(',')));
+    const rows=[['שם','אזור',...data.fields.map(f=>f.label)].map(q).join(',')];
+    sites.forEach(s=>rows.push([s.name,an(s),...data.fields.map(f=>s.values[f.id])].map(q).join(',')));
     const a=document.createElement('a');
     a.href=URL.createObjectURL(new Blob(['\ufeff'+rows.join('\r\n')],{type:'text/csv'}));a.download='summary.csv';a.click();
   };
@@ -533,31 +606,72 @@ function renderFields(){
   c.querySelector('#addf').onclick=()=>{const l=c.querySelector('#nl').value.trim();if(!l)return;F().push({id:uid(),label:l,type:c.querySelector('#nt').value});fieldsChanged();render()};
 }
 
-/* ====== add dialog ====== */
-function openAdd(){
+/* ====== add site dialog ====== */
+function fillAreaSelect(sel,val){
+  sel.innerHTML='<option value="">ללא אזור</option>'+data.areas.map(a=>`<option value="${a.id}">${esc(a.name)}</option>`).join('');
+  sel.value=data.areas.some(a=>a.id===val)?val:'';
+}
+function openAdd(areaId){
   $('newName').value='';$('newAddr').value='';
+  fillAreaSelect($('newArea'),areaId);
   $('modal').classList.remove('hidden');
   setTimeout(()=>$('newName').focus(),50);
 }
 function closeAdd(){$('modal').classList.add('hidden')}
 $('cancelAdd').onclick=closeAdd;
 $('modal').onclick=e=>{if(e.target.id==='modal')closeAdd()};
-document.addEventListener('keydown',e=>{if(e.key==='Escape')closeAdd()});
-$('newName').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();$('newAddr').focus()}});
 $('addForm').onsubmit=e=>{
   e.preventDefault();
-  const name=$('newName').value.trim(),addr=$('newAddr').value.trim();
+  const name=$('newName').value.trim(),addr=$('newAddr').value.trim(),area=$('newArea').value;
   if(!name&&!addr){$('newName').focus();return}
   const now=Date.now();
-  const s={id:uid(),c:now,name:name||addr,values:addr?{address:addr}:{},ts:addr?{name:now,address:now}:{name:now}};
+  const ts={name:now};if(addr)ts.address=now;if(area)ts.area=now;
+  const s={id:uid(),c:now,name:name||addr,area,values:addr?{address:addr}:{},ts};
   data.sites.push(s);markDirty();closeAdd();
-  query='';view='home';openId=null;
-  toggle(s.id);
+  openAreas.add(area);saveOA();
+  query='';view='home';openId=s.id;render();
+  const el=document.querySelector(`.site[data-id="${s.id}"]`);if(el)el.scrollIntoView({behavior:'smooth',block:'start'});
 };
 
+/* ====== area dialog ====== */
+let editingArea=null;
+function areasChanged(){data.ats=Date.now();markDirty()}
+function openArea(id){
+  editingArea=id||null;
+  const a=id?data.areas.find(x=>x.id===id):null;
+  $('areaTitle').textContent=a?'עריכת אזור':'אזור חדש';
+  $('areaName').value=a?a.name:'';
+  $('areaDel').classList.toggle('hidden',!a);
+  $('amodal').classList.remove('hidden');
+  setTimeout(()=>$('areaName').focus(),50);
+}
+function closeArea(){$('amodal').classList.add('hidden')}
+$('areaCancel').onclick=closeArea;
+$('amodal').onclick=e=>{if(e.target.id==='amodal')closeArea()};
+$('areaForm').onsubmit=e=>{
+  e.preventDefault();
+  const name=$('areaName').value.trim();
+  if(!name){$('areaName').focus();return}
+  if(editingArea){const a=data.areas.find(x=>x.id===editingArea);if(a)a.name=name}
+  else{const a={id:uid(),name};data.areas.push(a);openAreas.add(a.id);saveOA()}
+  areasChanged();closeArea();view='home';render();
+};
+$('areaDel').onclick=()=>{
+  const a=data.areas.find(x=>x.id===editingArea);if(!a)return;
+  const cnt=live().filter(s=>s.area===a.id).length;
+  if(!confirm('למחוק את האזור "'+a.name+'"?'+(cnt?'\n'+cnt+' אתרים שבו יעברו ל"ללא אזור".':'')))return;
+  const now=Date.now();
+  for(const s of data.sites)if(s.area===a.id){s.area='';s.ts.area=now}
+  data.areas=data.areas.filter(x=>x.id!==a.id);
+  openAreas.delete(a.id);saveOA();
+  areasChanged();closeArea();render();
+};
+
+document.addEventListener('keydown',e=>{if(e.key==='Escape'){closeAdd();closeArea()}});
+
 $('btnHome').onclick=()=>{openId=null;query='';go('home')};
-$('btnAdd').onclick=openAdd;
-$('fab').onclick=openAdd;
+$('btnAdd').onclick=()=>openAdd('');
+$('fab').onclick=()=>openAdd('');
 $('btnSummary').onclick=()=>go('summary');
 $('btnFields').onclick=()=>go('fields');
 
