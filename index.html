@@ -92,6 +92,12 @@ h2{margin:0 0 4px;font-size:24px;letter-spacing:-.4px}
 .score{display:grid;grid-template-columns:repeat(10,1fr);gap:4px}
 .score button{min-height:46px;padding:0;font-size:16px}
 .score button.on{background:linear-gradient(135deg,var(--accent),#4f8cff);color:#fff;border-color:transparent;font-weight:700}
+.sect{margin-top:26px;padding-top:14px;border-top:1px dashed var(--line);font-weight:700;font-size:17px;color:var(--accent)}
+.stepper{display:flex;gap:8px}
+.stepper input{flex:1;min-width:0;text-align:center;font-size:20px;font-weight:600}
+.stepper button{width:60px;min-height:48px;padding:0;font-size:24px;flex:0 0 auto}
+.totals{display:flex;gap:8px;flex-wrap:wrap;margin:0 0 14px}
+.totals .chip{font-size:14px;padding:6px 14px}
 .tel{display:flex;gap:8px}
 .tel input{flex:1}
 .chips{display:flex;gap:6px;flex-wrap:wrap;margin-top:12px}
@@ -214,6 +220,15 @@ const VAULT={"s":"4aJBOjzL+7s0RJ2i8LgHKg==","i":"1FZV69gtF34PoMBm","n":200000,"c
 
 const KEY='siteReviewData_v3', OLDKEY='siteReviewData_v2';
 
+// Equipment-to-replace block (added in field version 2)
+const EQ_FIELDS=[
+  {id:'cabinet',label:'ארון תקשורת תקין',type:'yesno'},
+  {id:'sect_eq',label:'ציוד בלאי להחלפה',type:'section'},
+  {id:'eq_screens',label:'מסכים להחלפה',type:'num'},
+  {id:'eq_printers',label:'מדפסות להחלפה',type:'num'},
+  {id:'eq_scanners',label:'סורקים להחלפה',type:'num'},
+  {id:'eq_misc',label:'ציוד שונות להחלפה',type:'textarea'}
+];
 const defaultFields=[
   {id:'address',label:'כתובת / מיקום',type:'location'},
   {id:'contact',label:'איש קשר / טלפון',type:'tel'},
@@ -223,11 +238,12 @@ const defaultFields=[
   {id:'power',label:'חשמל',type:'yesno'},
   {id:'parking',label:'חניה',type:'yesno'},
   {id:'access',label:'נגישות',type:'yesno'},
+  ...EQ_FIELDS,
   {id:'rating',label:'ציון (1-10)',type:'score'},
   {id:'issues',label:'ליקויים / בעיות',type:'textarea'},
   {id:'opinion',label:'חוות דעת כללית',type:'textarea'}
 ];
-const TYPES={text:'טקסט קצר',textarea:'טקסט ארוך',yesno:'כן / לא',score:'ציון 1-10',tel:'טלפון',url:'קישור',location:'מיקום'};
+const TYPES={text:'טקסט קצר',textarea:'טקסט ארוך',yesno:'כן / לא',score:'ציון 1-10',num:'כמות (מספר)',section:'כותרת קטגוריה',tel:'טלפון',url:'קישור',location:'מיקום'};
 
 const $=id=>document.getElementById(id);
 const clone=o=>JSON.parse(JSON.stringify(o));
@@ -249,6 +265,7 @@ function normalize(d){
   d.fts=d.fts||0;
   if(!Array.isArray(d.areas))d.areas=[];
   d.ats=d.ats||0;
+  d.fv=d.fv||0;
   for(const s of d.sites){s.values=s.values||{};s.ts=s.ts||{};s.c=s.c||0;s.name=s.name||'';s.area=s.area||''}
   for(const f of d.fields){
     if(f.id==='rating'&&f.type==='text')f.type='score';
@@ -272,7 +289,21 @@ function load(){
       return d;
     }
   }catch(e){}
-  return {fields:clone(defaultFields),fts:0,areas:[],ats:0,sites:[]};
+  return {fields:clone(defaultFields),fts:0,fv:2,areas:[],ats:0,sites:[]};
+}
+// One-time upgrade of an existing field list: add the equipment block after "access".
+// Runs after remote changes were merged, so other devices' custom fields are never lost.
+function migrateFields(){
+  if((data.fv||0)>=2)return false;
+  const have=new Set(data.fields.map(f=>f.id));
+  const items=clone(EQ_FIELDS).filter(f=>!have.has(f.id));
+  let at=data.fields.findIndex(f=>f.id==='access');
+  if(at<0)at=data.fields.findIndex(f=>f.id==='rating')-1;
+  at=at<0?data.fields.length:at+1;
+  data.fields.splice(at,0,...items);
+  data.fv=2;data.fts=Date.now();
+  dirty=true;editVer++;localStorage.setItem('srDirty','1');save();
+  return true;
 }
 function save(){localStorage.setItem(KEY,JSON.stringify(data))}
 function markDirty(){dirty=true;editVer++;localStorage.setItem('srDirty','1');save();schedulePush()}
@@ -283,7 +314,7 @@ const live=()=>data.sites.filter(s=>!s.deleted).sort((a,b)=>b.c-a.c);
 // Apply newer remote changes into local data IN PLACE (keeps UI handlers valid). Returns true if anything changed.
 function mergeInto(L,R){
   let changed=false;
-  if((R.fts||0)>(L.fts||0)){L.fields=R.fields;L.fts=R.fts;changed=true}
+  if((R.fts||0)>(L.fts||0)){L.fields=R.fields;L.fts=R.fts;L.fv=R.fv||0;changed=true}
   if((R.ats||0)>(L.ats||0)){L.areas=R.areas;L.ats=R.ats;changed=true}
   for(const r of R.sites){
     const l=L.sites.find(x=>x.id===r.id);
@@ -332,6 +363,7 @@ async function sync(){
       if(r.ok){const j=await r.json();sha=j.sha;remote=normalize(JSON.parse(b64dec(j.content)))}
       else if(r.status!==404)throw new Error('GET '+r.status);
       if(remote&&mergeInto(data,remote)){save();refreshUI()}
+      if(migrateFields())refreshUI();
       if(dirty||!remote){
         const v=editVer;
         const p=await gh('PUT',{message:'update '+new Date().toISOString(),content:b64enc(JSON.stringify(data)),...(sha?{sha}:{})});
@@ -379,6 +411,7 @@ function enter(){
   $('login').classList.add('hidden');
   $('app').classList.remove('hidden');
   setStatus(token?(dirty?'wait':'ok'):'local');
+  if(!token)migrateFields();
   render();
   sync();
 }
@@ -397,13 +430,16 @@ const chip=(label,v)=>{
   const cls=v==='כן'?'ok':v==='לא'?'bad':'mid';
   return `<span class="chip ${cls}">${esc(label)}: ${esc(v)}</span>`;
 };
+const numSum=s=>data.fields.filter(f=>f.type==='num').reduce((t,f)=>t+(parseInt(s.values[f.id],10)||0),0);
 function chipsFor(s){
-  return chip('רשת',s.values.network)+chip('סלולר',s.values.cell)+chip('Wi-Fi',s.values.wifi)+(s.values.rating?`<span class="chip">⭐ ${esc(s.values.rating)}</span>`:'');
+  const eq=numSum(s);
+  return chip('רשת',s.values.network)+chip('סלולר',s.values.cell)+chip('Wi-Fi',s.values.wifi)+(s.values.rating?`<span class="chip">⭐ ${esc(s.values.rating)}</span>`:'')+(eq?`<span class="chip mid">להחלפה: ${eq}</span>`:'');
 }
 const yn=[['כן','yes'],['לא','no'],['חלקית','mid']];
 const telHref=v=>'tel:'+String(v).replace(/[^\d+]/g,'');
 
 function fieldHtml(s,f){
+  if(f.type==='section')return `<div class="full sect">${esc(f.label)}</div>`;
   const v=s.values[f.id]??'';
   const full=(f.type==='textarea'||f.type==='location'||f.type==='score')?' full':'';
   let h=`<div class="${full}"><label>${esc(f.label)}</label>`;
@@ -418,6 +454,8 @@ function fieldHtml(s,f){
       h+=`<div class="score" role="group" aria-label="${esc(f.label)}" data-seg="${f.id}">${[1,2,3,4,5,6,7,8,9,10].map(n=>`<button type="button" class="${String(n)===String(v)?'on':''}" data-val="${n}" aria-pressed="${String(n)===String(v)}">${n}</button>`).join('')}</div>`;break;
     case 'tel':
       h+=`<div class="tel"><input type="tel" inputmode="tel" autocomplete="off" data-f="${f.id}" value="${esc(v)}" placeholder="שם / מספר"><a class="btn" data-call="${f.id}" href="${v?telHref(v):'#'}" aria-label="התקשר">📞</a></div>`;break;
+    case 'num':
+      h+=`<div class="stepper"><button type="button" data-step="1" data-for="${f.id}" aria-label="הוסף">＋</button><input type="text" inputmode="numeric" pattern="[0-9]*" autocomplete="off" data-num data-f="${f.id}" value="${esc(v)}" placeholder="0" aria-label="${esc(f.label)}"><button type="button" data-step="-1" data-for="${f.id}" aria-label="הפחת">−</button></div>`;break;
     case 'url':
       h+=`<input type="url" inputmode="url" data-f="${f.id}" value="${esc(v)}">`;break;
     default:
@@ -511,6 +549,7 @@ function renderHome(){
       const el=document.querySelector(`.site[data-id="${s.id}"]`);if(el)el.scrollIntoView({block:'start'});
     };
     card.querySelectorAll('input[data-f],textarea[data-f]').forEach(el=>el.oninput=()=>{
+      if(el.hasAttribute('data-num')){const c=el.value.replace(/\D/g,'').slice(0,4);if(c!==el.value)el.value=c}
       s.values[el.dataset.f]=el.value;upd(el.dataset.f);
       const call=card.querySelector(`[data-call="${el.dataset.f}"]`);
       if(call)call.href=el.value?telHref(el.value):'#';
@@ -521,6 +560,11 @@ function renderHome(){
       seg.querySelectorAll('button').forEach(x=>{const on=x.dataset.val===String(s.values[id]);x.classList.toggle('on',on);x.setAttribute('aria-pressed',on)});
       upd(id);
     }));
+    card.querySelectorAll('[data-step]').forEach(b=>b.onclick=()=>{
+      const el=card.querySelector(`[data-f="${b.dataset.for}"]`);
+      el.value=Math.max(0,(parseInt(el.value,10)||0)+(+b.dataset.step));
+      el.dispatchEvent(new Event('input'));
+    });
     card.querySelectorAll('[data-call]').forEach(a=>a.onclick=e=>{if(a.getAttribute('href')==='#')e.preventDefault()});
     card.querySelectorAll('[data-gps]').forEach(b=>b.onclick=()=>{
       if(!navigator.geolocation)return alert('המכשיר לא תומך במיקום');
@@ -552,19 +596,26 @@ function ordered(){
   const idx=a=>{const i=data.areas.findIndex(x=>x.id===a);return i<0?9999:i};
   return live().sort((a,b)=>idx(a.area)-idx(b.area)||byName(a,b));
 }
+function totalsHtml(sites){
+  const nums=data.fields.filter(f=>f.type==='num');
+  if(!nums.length)return '';
+  return '<div class="totals">'+nums.map(f=>`<span class="chip mid">${esc(f.label)}: <b>${sites.reduce((t,s)=>t+(parseInt(s.values[f.id],10)||0),0)}</b></span>`).join('')+'</div>';
+}
 function renderSummary(){
   const c=$('content');
   const sites=ordered();
+  const D={fields:data.fields.filter(f=>f.type!=='section')};
   const val=(s,f)=>esc(s.values[f.id]);
   const an=s=>(areaOf(s)||{}).name||'';
   let h=`<div class="row noprint" style="margin-bottom:14px"><div style="flex:1;min-width:160px"><h2>סיכום כל האתרים</h2><p class="sub" style="margin:0">${sites.length} אתרים</p></div><button id="print">🖨 PDF</button><button id="csv">⬇ אקסל</button></div>`;
-  h+=`<div class="scroll"><table><thead><tr><th>#</th><th>שם</th><th>אזור</th>${data.fields.map(f=>`<th>${esc(f.label)}</th>`).join('')}</tr></thead><tbody>`;
-  sites.forEach((s,i)=>{h+=`<tr><td>${i+1}</td><td><b>${esc(s.name)}</b></td><td>${esc(an(s))}</td>${data.fields.map(f=>`<td>${val(s,f).replace(/\n/g,'<br>')}</td>`).join('')}</tr>`});
-  if(!sites.length)h+=`<tr><td colspan="${data.fields.length+3}" style="text-align:center;color:var(--muted)">אין אתרים עדיין</td></tr>`;
+  h+=totalsHtml(sites);
+  h+=`<div class="scroll"><table><thead><tr><th>#</th><th>שם</th><th>אזור</th>${D.fields.map(f=>`<th>${esc(f.label)}</th>`).join('')}</tr></thead><tbody>`;
+  sites.forEach((s,i)=>{h+=`<tr><td>${i+1}</td><td><b>${esc(s.name)}</b></td><td>${esc(an(s))}</td>${D.fields.map(f=>`<td>${val(s,f).replace(/\n/g,'<br>')}</td>`).join('')}</tr>`});
+  if(!sites.length)h+=`<tr><td colspan="${D.fields.length+3}" style="text-align:center;color:var(--muted)">אין אתרים עדיין</td></tr>`;
   h+='</tbody></table></div><div class="scards">';
   if(!sites.length)h+='<div class="card empty"><p>אין אתרים עדיין</p></div>';
   sites.forEach((s,i)=>{
-    const rows=data.fields.filter(f=>s.values[f.id]).map(f=>`<dt>${esc(f.label)}</dt><dd>${val(s,f)}</dd>`).join('');
+    const rows=D.fields.filter(f=>s.values[f.id]).map(f=>`<dt>${esc(f.label)}</dt><dd>${val(s,f)}</dd>`).join('');
     h+=`<div class="card scard"><h3>${i+1}. ${esc(s.name||'ללא שם')}</h3>${an(s)?`<p class="sub" style="margin:-6px 0 10px">${esc(an(s))}</p>`:''}${rows?`<dl>${rows}</dl>`:'<p class="sub" style="margin:0">עוד לא מולאו נתונים</p>'}</div>`;
   });
   h+='</div>';
@@ -572,8 +623,8 @@ function renderSummary(){
   c.querySelector('#print').onclick=()=>window.print();
   c.querySelector('#csv').onclick=()=>{
     const q=v=>'"'+String(v??'').replace(/"/g,'""')+'"';
-    const rows=[['שם','אזור',...data.fields.map(f=>f.label)].map(q).join(',')];
-    sites.forEach(s=>rows.push([s.name,an(s),...data.fields.map(f=>s.values[f.id])].map(q).join(',')));
+    const rows=[['שם','אזור',...D.fields.map(f=>f.label)].map(q).join(',')];
+    sites.forEach(s=>rows.push([s.name,an(s),...D.fields.map(f=>s.values[f.id])].map(q).join(',')));
     const a=document.createElement('a');
     a.href=URL.createObjectURL(new Blob(['\ufeff'+rows.join('\r\n')],{type:'text/csv'}));a.download='summary.csv';a.click();
   };
